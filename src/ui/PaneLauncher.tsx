@@ -1,23 +1,5 @@
-/**
- * The empty-slot launcher. This is the screen the whole port exists to change:
- * Chorus offered "Run Claude"; this offers Devin.
- *
- * Deliberately minimal. Model, first prompt and permission mode are NOT here
- * even though the CLI accepts all three, because the pane is the real `devin`
- * TUI: you pick a model with `/model`, type your first message at the prompt,
- * and cycle permissions with `Shift+Tab`. Duplicating those in a launch form
- * gives two ways to do one thing and two places to fall out of sync — and the
- * form's copy goes stale the moment Devin ships a new model or mode.
- *
- * What remains is what the TUI genuinely cannot change after the fact: the
- * working directory the process is spawned in, plus a label for our sidebar.
- *
- * Styled as the instrument's front panel (DESIGN.md §9): a readout rule names
- * the slot, the two controls sit under `label`-styled engravings, and exactly
- * one of the three actions is brass. The panel sheds its prose — and then its
- * heading — via container queries, because a six-way split leaves a pane barely
- * 300px wide and the fields have to survive that.
- */
+import { devinEnabled } from './demo-mode.js';
+/** Launch native Codex with a configured model, or open a plain terminal. */
 import { useState } from 'react';
 import type { AgentConfiguration } from '../server/protocol.js';
 
@@ -86,7 +68,7 @@ export function PaneLauncher({
           <label className="field">
             <span>Agent</span>
             <select value={agent} onChange={(e) => setAgent(e.target.value as 'devin' | 'codex')}>
-              <option value="codex">Codex</option><option value="devin">Devin</option>
+              <option value="codex">Codex</option>{devinEnabled() && <option value="devin">Devin</option>}
             </select>
           </label>
           {agent === 'codex' && <label className="field">

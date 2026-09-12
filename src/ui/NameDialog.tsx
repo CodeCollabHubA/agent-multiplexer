@@ -1,3 +1,4 @@
+import { devinEnabled } from './demo-mode.js';
 /**
  * Naming card — create a workspace, rename a workspace, or rename a session.
  *
@@ -153,7 +154,7 @@ export function NameDialog({
           </div>
         )}
 
-        {creating && (
+        {creating && devinEnabled() && (
           <label className="field">
             <span>context.dev API key</span>
             {/* type=password so the key is not shoulder-read or captured in a

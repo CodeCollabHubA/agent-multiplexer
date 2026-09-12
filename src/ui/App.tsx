@@ -1,3 +1,4 @@
+import { devinEnabled } from './demo-mode.js';
 import { cardLaunchIntent, freshSession } from './launch-request.js';
 /**
  * App shell. Owns AppState (mirrored to the server on every change), pane
@@ -548,17 +549,16 @@ export function App() {
             <p>
               A workspace is a named group of agent sessions with its own layout and a default
               working directory. Point one at a project, pick how many terminals you want, and run
-              several agents side by side &mdash; each with its own status, context budget and
-              transcript.
+              Codex agents side by side, with model routing, Exa search, and live status.
             </p>
             {/* One primary action per region: only the first is brass. */}
             <div className="empty-actions">
               <button className="primary" onClick={newWorkspace}>
                 Create a workspace
               </button>
-              <button className="secondary" onClick={() => setPicker(true)}>
-                Resume a past session
-              </button>
+              {devinEnabled() && <button className="secondary" onClick={() => setPicker(true)}>
+                Resume a Devin session
+              </button>}
             </div>
           </div>
         ) : (
@@ -631,7 +631,7 @@ export function App() {
               )}
 
               <span className="spacer" />
-              <button onClick={() => setPicker(true)}>Sessions…</button>
+              {devinEnabled() && <button onClick={() => setPicker(true)}>Devin sessions…</button>}
             </header>
 
             {active.view === 'board' ? (

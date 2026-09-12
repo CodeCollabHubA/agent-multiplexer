@@ -1,3 +1,4 @@
+import { devinEnabled } from './demo-mode.js';
 /**
  * Ticket editor — create a new Kanban card or edit a backlog one.
  *
@@ -145,7 +146,7 @@ export function CardDialog({
         <label className="field">
           <span>Agent</span>
           <select value={agent} onChange={(e) => setAgent(e.target.value as 'devin' | 'codex')}>
-            <option value="codex">Codex</option><option value="devin">Devin</option>
+            <option value="codex">Codex</option>{(devinEnabled() || (!creating && (spec.card.agent ?? 'devin') === 'devin')) && <option value="devin">Devin</option>}
           </select>
         </label>
 

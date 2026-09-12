@@ -22,92 +22,14 @@ interface Section {
 }
 
 const SECTIONS: Section[] = [
-  {
-    title: 'Workspaces',
-    body: (
-      <>
-        A workspace is a named group of agent sessions with its own layout and a default working
-        directory. Add one with <b>+ New workspace</b>, rename with <b>✎</b> (or double-click), and
-        remove with <b>✕</b>. Point it at a project directory where agents may work.
-      </>
-    ),
-  },
-  {
-    title: 'Terminals & layout',
-    body: (
-      <>
-        Pick <b>1–6</b> from the <b>Terminals</b> dropdown. Drag the dividers to resize; the
-        terminals reflow. <b>Reset</b> re-evens the splits without touching the running processes.
-        Closing a pane with <b>✕</b> shrinks the grid — the slot goes away rather than leaving an
-        empty launcher behind.
-      </>
-    ),
-  },
-  {
-    title: 'Run an agent',
-    body: (
-      <>
-        In an empty pane, choose Codex, Devin, or a plain terminal. Each pane is the native agent
-        TUI. Codex uses workspace-write access with approval on request; review <code>/hooks</code>
-        when asked so lifecycle status can be verified.
-      </>
-    ),
-  },
-  {
-    title: 'Status & attention',
-    body: (
-      <>
-        Every pane and sidebar row carries a live status — <b>idle</b>, <b>running</b>,{' '}
-        <b>waiting</b>, <b>exited</b> — driven by the agent's own lifecycle hooks, not by guessing at
-        terminal output. When an agent needs you its pane header lights amber, its workspace gets a
-        marker, and the count appears at the top right. That's the point of running six at once: you
-        work by exception instead of watching panes.
-      </>
-    ),
-  },
-  {
-    title: 'Resume a past session',
-    body: (
-      <>
-        <b>Sessions</b> lists every Devin conversation on this machine. <b>Resume</b> relaunches one
-        with <code>devin -r</code> in <b>its own new workspace</b>, at the directory it originally
-        ran in — that flag only works from there. Sessions marked <b>locked</b> are open in a
-        running process; Devin allows one holder at a time.
-      </>
-    ),
-  },
-  {
-    title: 'Trace a session',
-    body: (
-      <>
-        <b>Trace</b> replays a conversation turn by turn: prompts, replies, thinking, and every tool
-        call paired with its result, duration and file diff. It reads Devin's own record over ACP,
-        so nothing is reconstructed or copied. Live panes can't be traced while they run — the same
-        one-holder lock — so trace a session once its pane is closed.
-      </>
-    ),
-  },
-  {
-    title: 'Context health',
-    body: (
-      <>
-        The <b>%</b> readout estimates how full a pane's context window is: green, amber past 50%,
-        red past 70%, where quality starts degrading well before the hard limit. It's an{' '}
-        <i>estimate</i> — Devin reports cumulative token totals, so the figure is derived from
-        per-turn deltas. Hover it for the exact counts and the model's real window.
-      </>
-    ),
-  },
-  {
-    title: 'Where your state lives',
-    body: (
-      <>
-        Workspaces, layouts and sessions are saved to <code>~/.devin-agent-tmux/</code> as readable
-        JSON. Agents run on this machine; model requests use the configured provider, and the optional
-        Convex mirror synchronizes app state when enabled.
-      </>
-    ),
-  },
+  { title: 'Workspaces', body: <>Create a workspace pointing at your project directory. Choose a <b>board</b> for tickets or a <b>terminal grid</b> for interactive Codex sessions.</> },
+  { title: 'Tickets into tasks', body: <>Add a title and a clear description, then press <b>Start</b>. Codex receives the description as its first instruction. Open the card to watch and interact with its native terminal.</> },
+  { title: 'Model routing', body: <><b>Auto</b> asks OpenRouter to classify a ticket as simple, standard, or complex and selects the configured model. You can also choose a model manually. Empty interactive panes use the standard default. The badge shows the launch choice and reason; it does not track later native model changes.</> },
+  { title: 'Search with Exa', body: <>Ask Codex to research current documentation with <b>Exa</b> and cite its sources. Search readiness appears in the launcher. Tool calls and results appear in the Codex terminal.</> },
+  { title: 'Parallel terminals', body: <>Choose <b>1–6</b> terminals and drag dividers to resize. Each pane holds an independent Codex session. Use tabs or maximize a pane when you need more room.</> },
+  { title: 'Status & attention', body: <>Trusted Codex hooks report running, waiting, interrupted, and completed turns. Review the project and <code>/hooks</code> trust prompts when asked. <b>Status unverified</b> means the app has not verified hooks for this invocation. Codex uses workspace-write access with approval on request.</> },
+  { title: 'Resume & retry', body: <>On a stopped ticket, <b>Resume same model</b> reopens its saved conversation without submitting the original task again. <b>Restart</b> starts the ticket afresh; <b>Retry</b> starts a fresh standalone session. Interrupting a turn keeps its terminal available for your next instruction.</> },
+  { title: 'State & reconnect', body: <>Workspaces, tickets, layouts, and session identities are saved locally. Refresh to reconnect to processes still running on this machine. Model requests go to OpenRouter and search requests go to Exa; credentials stay on the server. Restarting the server stops its running agents.</> },
 ];
 
 export function Guide({ onClose }: { onClose: () => void }) {
@@ -130,7 +52,7 @@ export function Guide({ onClose }: { onClose: () => void }) {
         </header>
 
         <p className="guide-lede">
-          Run Codex and Devin CLI agents in parallel. Agent Workspace arranges their native terminals,
+          Run Codex agents in parallel. Agent Workspace arranges their native terminals,
           watches trusted lifecycle events, and remembers launch choices.
         </p>
 

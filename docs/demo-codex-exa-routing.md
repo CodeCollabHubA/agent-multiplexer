@@ -160,3 +160,20 @@ current status and route replay in a fresh browser, visible retained output and
 successful Retry with a new Codex UUID, and manual card moves surviving replay
 until the next actual lifecycle event. These browser checks used local fixtures;
 the live search smoke above used real Codex, OpenRouter, and Exa.
+
+## Recording the Codex-focused demo
+
+The default UI offers Codex for new tickets and terminals. Devin history and
+context.dev workspace settings are hidden. Leave `VITE_ENABLE_DEVIN` unset or
+`false`; setting it to `true` exposes the optional legacy integration.
+
+Use a fresh `DEVIN_MUX_HOME` profile for recording so old workspaces and legacy
+sessions do not appear. This selects a separate directory; it does not migrate
+or delete existing data. Keep the existing profile path unchanged otherwise.
+
+For a short video: create two tickets of different complexity, show their
+OpenAI routing badges, open the parallel Codex terminals, have one use Exa for
+current documentation, and finish with its actual result and a passing check.
+Use the board's saved-conversation Resume when demonstrating recovery. Do not
+present legacy history browsing, ACP traces, or context-health estimates as
+Codex features. The first-run Guide explains the Codex workflow.
