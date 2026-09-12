@@ -12,6 +12,7 @@ import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import type { Backend } from './backend.js';
 import { TERMINAL_FONT, TERMINAL_THEME } from './theme.js';
+import { createTerminalResize } from './pane-resize.js';
 
 export function TerminalPane({
   paneId,
@@ -77,6 +78,7 @@ export function TerminalPane({
     // size. So output queues in `pending` and is flushed once `ready`. `attached`
     // is the separate attach handshake: pane:data that arrives before the
     // backlog snapshot is held so the older snapshot can't land on newer bytes.
+    const resize = createTerminalResize((cols, rows) => backend.send({ t: 'pane:resize', paneId, cols, rows }));
     let disposed = false;
     let ready = false;
     let attached = false;
@@ -98,7 +100,7 @@ export function TerminalPane({
         return; // renderer not ready yet; ResizeObserver will retry
       }
       ready = true;
-      backend.send({ t: 'pane:resize', paneId, cols: term.cols, rows: term.rows });
+      resize.schedule(term.cols, term.rows);
       onReady?.(term.cols, term.rows);
       flush();
     };
@@ -135,7 +137,7 @@ export function TerminalPane({
       }
       try {
         fit.fit();
-        backend.send({ t: 'pane:resize', paneId, cols: term.cols, rows: term.rows });
+        resize.schedule(term.cols, term.rows);
       } catch {
         /* zero-size while hidden in the tab strip */
       }
@@ -146,6 +148,7 @@ export function TerminalPane({
       disposed = true;
       off();
       observer.disconnect();
+      resize.cancel();
       term.dispose();
       termRef.current = null;
     };

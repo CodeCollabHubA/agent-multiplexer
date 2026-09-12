@@ -1,3 +1,4 @@
+import { PendingLayouts } from './layout-sync.js';
 import { devinEnabled } from './demo-mode.js';
 import { cardLaunchIntent, freshSession } from './launch-request.js';
 /**
@@ -108,7 +109,8 @@ export function App({ backend }: { backend: Backend }) {
 
   // Suppress the save that a server-pushed state would otherwise trigger,
   // which would bounce the same state back and forth between two open tabs.
-  const applyingRemote = useRef(false);
+  const skipPersistState = useRef<AppState | null>(null);
+  const pendingLayouts = useRef(new PendingLayouts());
 
   // Latest state, for event handlers that must read it without being rebuilt on
   // every change (e.g. deleting a card needs its paneId to kill the process).
@@ -121,10 +123,12 @@ export function App({ backend }: { backend: Backend }) {
         case 'env':
           setEnv({ home: msg.home, cwd: msg.cwd, hasDefaultContextKey: msg.hasDefaultContextKey });
           break;
-        case 'state':
-          applyingRemote.current = true;
-          setState(msg.state);
+        case 'state': {
+          const next = pendingLayouts.current.merge(msg.state);
+          skipPersistState.current = next;
+          setState(next);
           break;
+        }
         case 'config:result':
           setAgentConfig(msg.config);
           break;
@@ -197,10 +201,11 @@ export function App({ backend }: { backend: Backend }) {
 
   // Persist every change. The server writes the file tree and pushes to Convex.
   useEffect(() => {
-    if (applyingRemote.current) {
-      applyingRemote.current = false;
+    if (skipPersistState.current === state) {
+      skipPersistState.current = null;
       return;
     }
+    pendingLayouts.current.discardChanged(state);
     if (state.workspaceOrder.length === 0 && state.activeWorkspaceId === null) return;
     backend.send({ t: 'state:save', state });
   }, [state]);
@@ -659,11 +664,21 @@ export function App({ backend }: { backend: Backend }) {
             <section className={`stage ${maximized ? 'has-max' : ''}`}>
               {active.view === 'grid' ? (
                 <LayoutView
+                  key={active.id}
                   node={active.layout}
                   renderPane={renderPane}
-                  onResize={(path, sizes) =>
-                    setState((p) => setWorkspaceLayout(p, active.id, resizeSplit(active.layout, path, sizes)))
-                  }
+                  onResize={(path, sizes) => {
+                    const current = stateRef.current;
+                    const workspace = current.workspaces[active.id];
+                    if (!workspace) return;
+                    const layout = resizeSplit(workspace.layout, path, sizes);
+                    const next = setWorkspaceLayout(current, active.id, layout);
+                    if (import.meta.env.VITE_CONVEX_URL) pendingLayouts.current.set(active.id, layout, next.workspaces[active.id]!.updatedAt);
+                    backend.send({ t: 'state:save', state: next });
+                    skipPersistState.current = next;
+                    stateRef.current = next;
+                    setState(next);
+                  }}
                 />
               ) : (
                 <div className="tabs-view">

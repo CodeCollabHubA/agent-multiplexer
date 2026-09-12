@@ -174,11 +174,13 @@ export function updateSession(
   sessionId: string,
   fields: Partial<SessionConfig>,
 ): AppState {
-  return patch(state, wsId, (ws) => {
-    const prev = ws.sessions[sessionId];
-    if (!prev) return ws;
-    return { ...ws, sessions: { ...ws.sessions, [sessionId]: { ...prev, ...fields } } };
-  });
+  const previous = state.workspaces[wsId]?.sessions[sessionId];
+  // Reattaching a terminal replays runtime metadata. Do not persist that echo.
+  if (!previous || Object.entries(fields).every(([key, value]) =>
+    JSON.stringify(previous[key as keyof SessionConfig]) === JSON.stringify(value))) return state;
+  return patch(state, wsId, (ws) => ({
+    ...ws, sessions: { ...ws.sessions, [sessionId]: { ...previous, ...fields } },
+  }));
 }
 
 /** Reorder panes (tab drag). Rebuilds the layout so the grid follows the strip. */

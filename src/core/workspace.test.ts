@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addSession, createWorkspace, dirBasename, removeSession, uniqueWorkspaceName } from './workspace.js';
+import { addSession, createWorkspace, dirBasename, removeSession, updateSession, uniqueWorkspaceName } from './workspace.js';
 import { emptyState, type SessionConfig } from './models.js';
 import { collectLeaves } from './layout.js';
 
@@ -77,5 +77,19 @@ describe('removeSession shrinks the grid', () => {
     s = addSession(s, wsId, session('p1'));
     s = removeSession(s, wsId, 'p1');
     expect(collectLeaves(s.workspaces[wsId]!.layout)).toEqual([null]);
+  });
+});
+
+describe('updateSession repeated runtime metadata', () => {
+  it('preserves state identity for repeated session IDs', () => {
+    let state = createWorkspace(emptyState(), 'app', '/tmp');
+    const id = state.activeWorkspaceId!;
+    state = addSession(state, id, session('pane'));
+    state = updateSession(state, id, 'pane', { codexSessionId: 'session-1' });
+    expect(updateSession(state, id, 'pane', { codexSessionId: 'session-1' })).toBe(state);
+    expect(updateSession(state, id, 'missing', { codexSessionId: 'session-1' })).toBe(state);
+    const changed = updateSession(state, id, 'pane', { codexSessionId: 'session-2' });
+    expect(changed.workspaces[id]!.sessions.pane!.codexSessionId).toBe('session-2');
+    expect(changed).not.toBe(state);
   });
 });
