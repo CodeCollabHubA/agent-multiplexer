@@ -1,3 +1,4 @@
+import { ApprovalChoice } from './ApprovalChoice.js';
 import { devinEnabled } from './demo-mode.js';
 /**
  * Ticket editor — create a new Kanban card or edit a backlog one.
@@ -14,6 +15,7 @@ import { type Card, type DevinPermissionMode, DEFAULT_PERMISSION_MODE } from '..
 import type { AgentConfiguration } from '../server/protocol.js';
 
 export interface CardDraft {
+  skipApprovals?: boolean;
   title: string;
   description: string;
   cwd: string;
@@ -70,6 +72,7 @@ export function CardDialog({
   );
   const [contextKey, setContextKey] = useState('');
   const [agent, setAgent] = useState<'devin' | 'codex'>(creating ? 'codex' : (spec.card.agent ?? 'devin'));
+  const [skipApprovals, setSkipApprovals] = useState(!creating && spec.card.skipApprovals === true);
   const [modelId, setModelId] = useState(creating ? '' : (spec.card.modelId ?? ''));
   const titleRef = useRef<HTMLInputElement | null>(null);
 
@@ -91,7 +94,7 @@ export function CardDialog({
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!valid) return;
-    onSubmit({ title, description, cwd, permissionMode, contextApiKey: contextKey, agent, modelId: modelId || undefined });
+    onSubmit({ title, description, cwd, permissionMode, contextApiKey: contextKey, agent, skipApprovals, modelId: modelId || undefined });
   };
 
   return (
@@ -156,8 +159,10 @@ export function CardDialog({
             <option value="">Auto — classify this ticket</option>
             {config.models.map((m) => <option key={m.id} value={m.id}>{m.label} · {m.provider}</option>)}
           </select>
-          <small>{config.error ?? (config.routingReady ? `Workspace write access; asks before sensitive actions. Search ${config.searchReady ? 'ready' : 'unavailable'}.` : 'OpenRouter is not configured on the server.')}</small>
+          <small>{config.error ?? (config.routingReady ? `Workspace sandbox. Search ${config.searchReady ? 'ready' : 'unavailable'}.` : 'OpenRouter is not configured on the server.')}</small>
         </label>}
+
+        {agent === 'codex' && <ApprovalChoice checked={skipApprovals} onChange={setSkipApprovals} />}
 
         {agent === 'devin' && <label className="field">
           <span>Autonomy</span>

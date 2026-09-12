@@ -90,3 +90,10 @@ it('forwards the alias as the canonical credential only in child environment', (
   expect(JSON.stringify(call[1])).not.toContain('alias-only-secret');
   vi.unstubAllEnvs();
 });
+
+it('forwards per-agent skip-approval choice to the native Codex process', () => {
+  supervisor().spawn({ paneId: 'p', cwd: root, cols: 80, rows: 24, agent: 'codex', model: 'm', permissionMode: 'accept-edits', skipApprovals: true });
+  const args = (spawnMock.mock.calls as unknown[][])[0]?.[1] as string[];
+  expect(args.join(' ')).toContain('--sandbox workspace-write --ask-for-approval never');
+  expect(args.join(' ')).not.toContain('--dangerously-bypass');
+});

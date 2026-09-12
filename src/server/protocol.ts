@@ -20,7 +20,7 @@ import type { Trace } from '../core/trace.js';
 export type ClientMessage =
   | { t: 'state:save'; state: AppState }
   /** `contextApiKey` is the owning workspace's; the server falls back to .env. */
-  | { t: 'pane:spawn'; paneId: string; cwd: string; cols: number; rows: number; model?: string; modelId?: string; agent?: 'devin' | 'codex'; route?: RouteDecision; permissionMode: DevinPermissionMode; prompt?: string; title?: string; resumeSessionId?: string; shellOnly?: boolean; contextApiKey?: string }
+  | { t: 'pane:spawn'; paneId: string; cwd: string; cols: number; rows: number; model?: string; modelId?: string; agent?: 'devin' | 'codex'; route?: RouteDecision; permissionMode: DevinPermissionMode; skipApprovals?: boolean; prompt?: string; title?: string; resumeSessionId?: string; shellOnly?: boolean; contextApiKey?: string }
   | { t: 'config:get'; reqId: string }
   | { t: 'pane:input'; paneId: string; data: string }
   /** Sent when a terminal mounts, to replay the pane's recent output into it. */

@@ -177,3 +177,12 @@ current documentation, and finish with its actual result and a passing check.
 Use the board's saved-conversation Resume when demonstrating recovery. Do not
 present legacy history browsing, ACP traces, or context-health estimates as
 Codex features. The first-run Guide explains the Codex workflow.
+
+## Optional approval-free agents
+
+Enable **Skip approval prompts** in the terminal launcher or ticket form. It is
+off by default and uses `--ask-for-approval never` with `--sandbox workspace-write`.
+Sandbox-blocked actions fail instead of escalating. Project and hook trust prompts
+are separate and remain enabled. The setting is saved per agent/ticket and reused
+on restart, resume, and retry; changing a draft does not reconfigure a running
+process. An **Approvals off** badge identifies opted-in sessions.

@@ -45,3 +45,12 @@ it('keeps legacy history and context promises out of the empty workspace screen'
   expect(html).not.toContain('Resume a past session');
   expect(html).not.toContain('context budget');
 });
+
+it('offers an unchecked approval choice for new agents and preserves opted-in ticket edits', () => {
+  const fresh = renderToStaticMarkup(<PaneLauncher defaultCwd="/tmp" config={config} onLaunch={noop} onImport={noop} />);
+  expect(fresh).toContain('Skip approval prompts');
+  expect(fresh).not.toContain('checked=""');
+  const html = renderToStaticMarkup(<CardDialog spec={{ mode: 'edit', hasDefaultContextKey: false, card: { id: 'c', title: 'Task', description: '', cwd: '/tmp', column: 'backlog', agent: 'codex', skipApprovals: true, permissionMode: 'accept-edits', createdAt: 1 } }} config={config} onSubmit={noop} onCancel={noop} />);
+  expect(html).toContain('checked=""');
+  expect(html).toContain('inside the workspace sandbox');
+});

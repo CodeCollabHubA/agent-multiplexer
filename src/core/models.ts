@@ -54,6 +54,8 @@ export interface SessionConfig {
   modelId?: string;
   model?: string;
   permissionMode: DevinPermissionMode;
+  /** Codex only: skip approval prompts while retaining the workspace sandbox. */
+  skipApprovals?: boolean;
   /** First-turn prompt, passed positionally after `--`. */
   prompt?: string;
   /** When set, the pane launched with `devin -r <id>` instead of fresh. */
@@ -161,6 +163,8 @@ export interface Card {
   modelId?: string;
   model?: string;
   permissionMode: DevinPermissionMode;
+  /** Codex only: skip approval prompts while retaining the workspace sandbox. */
+  skipApprovals?: boolean;
   /** context.dev key for this card's session; falls back to CONTEXT_DEV_API_KEY. */
   contextApiKey?: string;
   createdAt: number;

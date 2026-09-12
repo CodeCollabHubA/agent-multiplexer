@@ -10,6 +10,6 @@ it('resumes the saved model and UUID without repeating the original instruction'
   expect(cardLaunchIntent(card, false)).toEqual({ prompt: card.description, route: undefined, resumeSessionId: undefined });
 });
 it('retry drops saved execution state and retains manual model intent', () => {
-  const session = { id: 'p', modelId: 'fast', route: { model: 'old' }, codexSessionId: 'old', resumeSessionId: 'old' } as SessionConfig;
-  expect(freshSession(session)).toMatchObject({ id: 'p', modelId: 'fast', route: undefined, codexSessionId: undefined, resumeSessionId: undefined });
+  const session = { id: 'p', skipApprovals: true, modelId: 'fast', route: { model: 'old' }, codexSessionId: 'old', resumeSessionId: 'old' } as SessionConfig;
+  expect(freshSession(session)).toMatchObject({ id: 'p', skipApprovals: true, modelId: 'fast', route: undefined, codexSessionId: undefined, resumeSessionId: undefined });
 });

@@ -37,7 +37,7 @@ Open **http://localhost:5173**. Create a workspace pointing at an existing proje
 
 `OPEN_ROUTER_API_KEY` is also accepted. If using that spelling, remove the `OPENROUTER_API_KEY` line from `.env`: the canonical spelling takes precedence even when blank. Never prefix credentials with `VITE_`.
 
-Codex starts directly with structured arguments, workspace-write sandbox access, and approval on request. Review the project and generated lifecycle hooks in Codex's normal trust UI. The app does not change your global Codex configuration or bypass trust prompts.
+Codex starts directly with structured arguments, workspace-write sandbox access, and approval on request by default. Enable **Skip approval prompts** when creating an agent or ticket to use `--ask-for-approval never` while retaining the workspace sandbox. Blocked actions fail instead of escalating; project and hook trust prompts still apply. The choice persists for restart, resume, and retry. Review the project and generated lifecycle hooks in Codex's normal trust UI. The app does not change your global Codex configuration or bypass trust prompts.
 
 ## Configure models
 

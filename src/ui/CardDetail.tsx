@@ -66,6 +66,7 @@ export function CardDetail({
 
         <div className="card-detail-meta">
           {launchPhase === 'canceled' ? <LaunchStatusBadge label="Canceled" /> : launchPhase === 'failed' ? <LaunchStatusBadge label="Failed" /> : started && launchPhase !== 'routing' && card.agent === 'codex' && (!card.codexSessionId || status === undefined) ? <LaunchStatusBadge label="Status unverified" /> : started && launchPhase !== 'routing' && <StatusBadge status={status ?? 'idle'} agent={card.agent ?? 'devin'} />}
+          {card.agent === 'codex' && card.skipApprovals === true && <span className="tag tag-neutral" title="Approval prompts off; workspace sandbox retained">Approvals off</span>}
           {(card.agent ?? 'devin') === 'devin' && <ContextBadge health={health} />}
           <span className="card-detail-cwd mono" title={card.cwd}>
             {card.cwd}

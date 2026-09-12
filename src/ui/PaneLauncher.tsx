@@ -1,9 +1,11 @@
+import { ApprovalChoice } from './ApprovalChoice.js';
 import { devinEnabled } from './demo-mode.js';
 /** Launch native Codex with a configured model, or open a plain terminal. */
 import { useState } from 'react';
 import type { AgentConfiguration } from '../server/protocol.js';
 
 export interface LaunchRequest {
+  skipApprovals?: boolean;
   name?: string;
   cwd: string;
   /** Launch a plain shell instead of devin — the escape hatch pane. */
@@ -44,10 +46,11 @@ export function PaneLauncher({
   const [name, setName] = useState('');
   const [cwd, setCwd] = useState(defaultCwd);
   const [agent, setAgent] = useState<'devin' | 'codex'>('codex');
+  const [skipApprovals, setSkipApprovals] = useState(false);
   const [modelId, setModelId] = useState('');
 
   const launch = (shellOnly: boolean) =>
-    onLaunch({ name: name.trim() || undefined, cwd: cwd.trim() || defaultCwd, shellOnly, agent, modelId: modelId || undefined });
+    onLaunch({ name: name.trim() || undefined, cwd: cwd.trim() || defaultCwd, shellOnly, agent, skipApprovals, modelId: modelId || undefined });
 
   return (
     <div className="launcher">
@@ -99,10 +102,12 @@ export function PaneLauncher({
           </label>
         </div>
 
+        {agent === 'codex' && <ApprovalChoice checked={skipApprovals} onChange={setSkipApprovals} />}
+
         <AgentLaunchActions agent={agent} routingReady={config.routingReady} onLaunch={() => launch(false)} onImport={onImport} onShell={() => launch(true)} />
 
         <p className="launcher-hint">
-          {agent === 'codex' ? 'Codex uses workspace-write with approval on request. The badge records the launch model.' : <>Starts with edits auto-approved. <code>Shift+Tab</code> cycles permission mode.</>}
+          {agent === 'codex' ? 'Codex keeps the workspace sandbox. The badge records the launch model.' : <>Starts with edits auto-approved. <code>Shift+Tab</code> cycles permission mode.</>}
         </p>
       </div>
     </div>

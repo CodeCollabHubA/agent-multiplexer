@@ -2,6 +2,7 @@ import { shellEscape } from './launch.js';
 
 export interface CodexLaunchOptions {
   model: string;
+  skipApprovals?: boolean;
   prompt?: string;
   resumeSessionId?: string;
   configEntries?: string[];
@@ -11,7 +12,7 @@ export interface CodexLaunchOptions {
 export function buildCodexArgs(options: CodexLaunchOptions): string[] {
   const args = [
     'codex', '--strict-config', '--no-alt-screen',
-    '--sandbox', 'workspace-write', '--ask-for-approval', 'on-request',
+    '--sandbox', 'workspace-write', '--ask-for-approval', options.skipApprovals === true ? 'never' : 'on-request',
     '-m', options.model,
   ];
   for (const entry of options.configEntries ?? []) args.push('-c', entry);
@@ -24,7 +25,7 @@ export function buildCodexArgs(options: CodexLaunchOptions): string[] {
 export function buildCodexLaunch(options: CodexLaunchOptions): string {
   const parts = [
     'codex', '--strict-config', '--no-alt-screen',
-    '--sandbox', 'workspace-write', '--ask-for-approval', 'on-request',
+    '--sandbox', 'workspace-write', '--ask-for-approval', options.skipApprovals === true ? 'never' : 'on-request',
     '-m', shellEscape(options.model),
   ];
   for (const entry of options.configEntries ?? []) parts.push('-c', shellEscape(entry));

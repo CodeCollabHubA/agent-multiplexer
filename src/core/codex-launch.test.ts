@@ -33,3 +33,11 @@ describe('buildCodexArgs', () => {
     expect(args.join(' ')).not.toContain('--dangerously-bypass-approvals-and-sandbox');
   });
 });
+
+it.each([undefined, 'saved-session'])('skips approvals only with explicit opt-in, retaining sandbox and hook trust (%s)', (resumeSessionId) => {
+  const args = buildCodexArgs({ model: 'm', skipApprovals: true, resumeSessionId });
+  expect(args.slice(args.indexOf('--ask-for-approval'), args.indexOf('--ask-for-approval') + 2)).toEqual(['--ask-for-approval', 'never']);
+  expect(args).toContain('workspace-write');
+  expect(args.join(' ')).not.toContain('--dangerously-bypass');
+  expect(buildCodexLaunch({ model: 'm', skipApprovals: true })).toContain('--ask-for-approval never');
+});

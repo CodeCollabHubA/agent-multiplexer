@@ -51,6 +51,7 @@ export interface SpawnOptions {
   agent?: 'devin' | 'codex';
   route?: RouteDecision;
   permissionMode: DevinPermissionMode;
+  skipApprovals?: boolean;
   prompt?: string;
   resumeSessionId?: string;
   /** Launch a plain shell instead of devin — the escape hatch pane. */
@@ -164,6 +165,7 @@ export class PaneSupervisor {
       }
       const scriptPath = this.store.ensureCodexHookScript(codexHookScriptSource());
       codexArgs = buildCodexArgs({
+        skipApprovals: opts.skipApprovals,
         model,
         prompt: opts.prompt,
         resumeSessionId: opts.resumeSessionId,

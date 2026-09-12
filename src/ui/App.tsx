@@ -226,6 +226,7 @@ export function App() {
         agent: session.agent,
         route: session.route,
         permissionMode: session.permissionMode,
+        skipApprovals: session.skipApprovals,
         prompt: session.prompt,
         resumeSessionId: session.resumeSessionId,
         shellOnly: opts.shellOnly,
@@ -259,6 +260,7 @@ export function App() {
         createdAt: Date.now(),
         agent: req.shellOnly ? undefined : (req.agent ?? 'codex'),
         modelId: req.modelId,
+        skipApprovals: req.skipApprovals,
         shellOnly: req.shellOnly,
       };
       setState((prev) => addSession(prev, active.id, session));
@@ -340,6 +342,7 @@ export function App() {
       title: card.title,
       ...cardLaunchIntent(card, resumeCodex),
       permissionMode: card.permissionMode,
+      skipApprovals: card.skipApprovals,
       contextApiKey: card.contextApiKey ?? stateRef.current.workspaces[wsId]?.contextApiKey,
     });
     if ((card.agent ?? 'devin') !== 'codex') setStatuses((s) => ({ ...s, [paneId]: 'running' }));
@@ -429,6 +432,7 @@ export function App() {
         <header className="pane-head">
           <span className="pane-name">{session.name || session.codexSessionId || session.devinSessionId || (session.shellOnly ? 'terminal' : (session.agent ?? 'devin'))}</span>
           {launchState?.phase === 'routing' ? <span className="tag tag-neutral" role="status">selecting model</span> : launchState?.phase === 'canceled' ? <LaunchStatusBadge label="Canceled" /> : launchState?.phase === 'failed' ? <LaunchStatusBadge label="Failed" /> : session.agent === 'codex' && (!session.codexSessionId || statuses[sessionId] === undefined) ? <LaunchStatusBadge label="Status unverified" /> : <StatusBadge status={status} agent={session.shellOnly ? 'shell' : (session.agent ?? 'devin')} />}
+          {session.agent === 'codex' && session.skipApprovals === true && <span className="tag tag-neutral" title="Approval prompts off; workspace sandbox retained">Approvals off</span>}
           {(session.agent ?? 'devin') === 'devin' && !session.shellOnly && <ContextBadge health={healths[sessionId]} />}
           {session.route && <span className="tag tag-neutral" title={`Launch selection: ${session.route.reason}`}>{session.route.provider} · {session.route.modelId}</span>}
           <span className="spacer" />

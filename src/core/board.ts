@@ -23,6 +23,7 @@ import {
 import type { RouteDecision } from './routing.js';
 
 export interface NewCardFields {
+  skipApprovals?: boolean;
   title: string;
   description: string;
   cwd: string;
@@ -64,6 +65,7 @@ export function createCard(
     model: fields.model,
     modelId: fields.modelId,
     agent: fields.agent,
+    skipApprovals: fields.skipApprovals,
     permissionMode: fields.permissionMode ?? DEFAULT_PERMISSION_MODE,
     // Blank normalises to undefined so it cannot shadow the .env default at
     // spawn — the same trap workspace keys avoid (see core/mcp.ts).
