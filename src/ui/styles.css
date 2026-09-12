@@ -1,0 +1,2049 @@
+/* ============================================================================
+   Instrument — see DESIGN.md, which is authoritative for every value below.
+
+   A precision-instrument system: cold graphite surfaces, one machined-brass
+   accent used roughly six times per screen, and typography borrowed from
+   engineering documentation. Depth is built from four surface steps and two
+   hairline weights — never from shadow, gradient or glow. Shadow appears only on
+   things that genuinely float (modals, the trace sheet).
+
+   Dark-first. The full dark palette is defined on bare `:root`; the cold-paper
+   light mode overrides tokens only, inside `prefers-color-scheme: light`.
+   ============================================================================ */
+
+:root {
+  /* ---- colour: dark (default) ------------------------------------------ */
+  --canvas: #0b0f14;
+  --surface-1: #131922;
+  --surface-2: #1b222c;
+  --surface-3: #242c38;
+  --hairline: #2c3542;
+  --hairline-strong: #3d4857;
+
+  --ink: #e9edf2;
+  --ink-2: #a6b2c0;
+  --ink-3: #7b8895;
+
+  --accent: #c8a15a;
+  --accent-fill: #c8a15a;
+  --accent-hover: #ddb771;
+  --accent-press: #a9843f;
+  --accent-wash: #c8a15a1f;
+  --accent-edge: #c8a15a66; /* brass at 40%, for secondary-button hover borders */
+  --on-accent: #0b0f14;
+  --focus-ring: #ddb771;
+  --ring: 0 0 0 3px #ddb77159;
+  --overlay: #0b0f14cc;
+
+  --success: #3dd68c;
+  --warning: #e8833a;
+  --danger: #e5484d;
+  --info: #5b9df9;
+  --success-wash: #3dd68c1f;
+  --warning-wash: #e8833a1f;
+  --danger-wash: #e5484d1f;
+  --info-wash: #5b9df91f;
+
+  /* Elevation. Dark mode builds depth with surface steps; these are reserved
+     for floating layers only. */
+  --shadow-flat: none;
+  --shadow-raised: 0 1px 2px rgb(0 0 0 / 0.32);
+  --shadow-overlay: 0 8px 24px -6px rgb(0 0 0 / 0.48), 0 2px 6px rgb(0 0 0 / 0.32);
+  --shadow-modal: 0 24px 64px -12px rgb(0 0 0 / 0.62);
+
+  /* ---- type ------------------------------------------------------------- */
+  --font-display: 'Cabinet Grotesk', 'Neue Haas Grotesk Display', system-ui, sans-serif;
+  --font-body: 'IBM Plex Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'SF Mono', ui-monospace, monospace;
+
+  /* ---- space: 4px base, 8px working step -------------------------------- */
+  --s1: 4px;
+  --s2: 8px;
+  --s3: 12px;
+  --s4: 16px;
+  --s5: 24px;
+  --s6: 32px;
+  --s7: 48px;
+  --s8: 64px;
+
+  /* ---- shape ------------------------------------------------------------ */
+  --r-none: 0;
+  --r-sm: 4px;
+  --r-md: 8px;
+  --r-lg: 12px;
+  --r-xl: 16px;
+  --r-full: 9999px;
+
+  /* ---- motion ----------------------------------------------------------- */
+  --d-instant: 90ms;
+  --d-fast: 140ms;
+  --d-base: 200ms;
+  --d-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-entrance: cubic-bezier(0.05, 0.7, 0.1, 1);
+
+  color-scheme: dark;
+}
+
+/* ---- colour: light (cold paper) ----------------------------------------- *
+   Not an inversion — a second material. Cold newsprint with white cards
+   floating on it, and a darkened brass for anything carrying text or an icon.
+   `raised` becomes a genuine soft shadow here rather than an outline.          */
+@media (prefers-color-scheme: light) {
+  :root {
+    --canvas: #eef1f4;
+    --surface-1: #ffffff;
+    --surface-2: #f6f8fa;
+    --surface-3: #eaeef2;
+    --hairline: #d8dee6;
+    --hairline-strong: #bcc5d0;
+
+    --ink: #0b0f14;
+    --ink-2: #4a5665;
+    --ink-3: #5e6b7a;
+
+    --accent: #8a6220;
+    --accent-fill: #c8a15a;
+    --accent-hover: #6f4e19;
+    --accent-press: #573c11;
+    --accent-wash: #c8a15a24;
+    --accent-edge: #8a622066;
+    --on-accent: #0b0f14;
+    --focus-ring: #8a6220;
+    --ring: 0 0 0 3px #8a622040;
+    --overlay: #0b0f1499;
+
+    --success: #1a7f52;
+    --warning: #9a4e12;
+    --danger: #b02128;
+    --info: #1f5fbf;
+    --success-wash: #1a7f5214;
+    --warning-wash: #9a4e1214;
+    --danger-wash: #b0212814;
+    --info-wash: #1f5fbf14;
+
+    --shadow-raised: 0 1px 3px rgb(11 15 20 / 0.10), 0 1px 2px rgb(11 15 20 / 0.06);
+    --shadow-overlay: 0 8px 24px -6px rgb(11 15 20 / 0.16), 0 2px 6px rgb(11 15 20 / 0.08);
+    --shadow-modal: 0 24px 64px -12px rgb(11 15 20 / 0.22);
+
+    color-scheme: light;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--canvas);
+  color: var(--ink);
+  font: 400 0.9375rem/1.65 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================================
+   TYPE UTILITIES — the scale from DESIGN.md §3, as classes.
+   Hierarchy is built with size and tracking, not weight.
+   ============================================================================ */
+
+.t-display-md {
+  font: 600 clamp(1.75rem, 3vw, 2.5rem) / 1.12 var(--font-display);
+  letter-spacing: -0.022em;
+  margin: 0;
+}
+.t-heading {
+  font: 600 1.5rem/1.2 var(--font-display);
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+.t-subheading {
+  font: 600 1.125rem/1.35 var(--font-body);
+  letter-spacing: -0.008em;
+  margin: 0;
+}
+.t-body-lg {
+  font: 400 1.0625rem/1.6 var(--font-body);
+}
+.t-body-sm,
+.small {
+  font: 400 0.875rem/1.55 var(--font-body);
+}
+.t-label,
+.label {
+  font: 500 0.8125rem/1.4 var(--font-body);
+  letter-spacing: 0.005em;
+}
+
+/* The engraved face. Labels, measures and reports — never prose. */
+.t-readout,
+.readout {
+  font: 500 0.75rem/1.3 var(--font-mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.t-data,
+.data,
+.path {
+  font: 450 0.875rem/1.45 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+code,
+.t-code {
+  font: 400 0.8125rem/1.7 var(--font-mono);
+}
+
+/* Prose measure. Body copy caps at 68 characters. */
+.prose {
+  max-width: 68ch;
+}
+
+.muted {
+  color: var(--ink-2);
+}
+.dim {
+  color: var(--ink-3);
+}
+.spacer {
+  flex: 1;
+  min-width: 0;
+}
+.path {
+  color: var(--ink-3);
+  font-size: 0.75rem;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  color: var(--danger);
+  font: 400 0.875rem/1.55 var(--font-body);
+  margin: 0;
+}
+.error::before {
+  content: '!';
+  flex: none;
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: var(--r-full);
+  font: 500 0.6875rem/1 var(--font-mono);
+}
+
+a,
+.link {
+  color: var(--ink);
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-underline-offset: 3px;
+}
+@media (hover: hover) {
+  a:hover,
+  .link:hover {
+    text-decoration-color: var(--accent-hover);
+  }
+}
+
+/* ============================================================================
+   SIGNATURE ELEMENT — the readout rule (DESIGN.md §9)
+
+   A 1px hairline-strong line running the full width of its container, with a
+   mono micro-label interrupting it flush left and an optional value flush
+   right. Never more than one per visual group.
+   ============================================================================ */
+
+.readout-rule {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-width: 0;
+  color: var(--ink-3);
+  font: 500 0.75rem/1.3 var(--font-mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.readout-rule > .rule-label {
+  flex: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.readout-rule > .rule-line {
+  flex: 1 1 auto;
+  min-width: var(--s4);
+  height: 1px;
+  background: var(--hairline-strong);
+}
+.readout-rule > .rule-value {
+  flex: none;
+  font: 450 0.875rem/1.45 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-2);
+}
+
+/* ============================================================================
+   PRIMITIVES — buttons and inputs (DESIGN.md §4)
+   ============================================================================ */
+
+/* Bare <button> is the secondary variant: surface-2 fill, hairline-strong
+   border, ink text. Most call sites use a bare button, and the screen may only
+   carry one brass action per region. */
+button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--s2);
+  height: 40px;
+  padding: 0 18px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--hairline-strong);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: 500 0.8125rem/1 var(--font-body);
+  letter-spacing: 0.005em;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color var(--d-fast) var(--ease-standard),
+    border-color var(--d-fast) var(--ease-standard), color var(--d-fast) var(--ease-standard),
+    transform var(--d-fast) var(--ease-standard);
+}
+@media (hover: hover) {
+  button:hover:not(:disabled) {
+    background: var(--surface-3);
+    border-color: var(--accent-edge);
+  }
+}
+button:active:not(:disabled) {
+  transform: translateY(0);
+}
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-color: var(--hairline-strong);
+}
+button:disabled {
+  background: var(--surface-3);
+  border-color: var(--hairline);
+  color: var(--ink-3);
+  cursor: not-allowed;
+}
+
+/* The one brass fill. One per screen region, never more. */
+button.primary {
+  background: var(--accent-fill);
+  border-color: var(--accent-fill);
+  color: var(--on-accent);
+}
+@media (hover: hover) {
+  button.primary:hover:not(:disabled) {
+    background: var(--accent-hover);
+    border-color: var(--accent-hover);
+    transform: translateY(-1px);
+  }
+}
+button.primary:active:not(:disabled) {
+  background: var(--accent-press);
+  border-color: var(--accent-press);
+  transform: translateY(0);
+}
+button.primary:disabled {
+  background: var(--surface-3);
+  border-color: var(--hairline);
+  color: var(--ink-3);
+}
+
+button.secondary {
+  background: var(--surface-2);
+  border-color: var(--hairline-strong);
+  color: var(--ink);
+}
+
+/* Ghost: no fill, no border, ink-2. Table rows and toolbars. */
+button.ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--ink-2);
+  padding: 0 var(--s2);
+}
+@media (hover: hover) {
+  button.ghost:hover:not(:disabled) {
+    background: var(--accent-wash);
+    border-color: transparent;
+    color: var(--ink);
+  }
+}
+button.ghost:disabled {
+  background: transparent;
+  border-color: transparent;
+}
+
+button.sm {
+  height: 32px;
+  padding: 0 var(--s3);
+}
+
+/* Icon-only buttons stay visually compact in dense chrome, but the ::after
+   overlay restores the 44x44 hit area the system requires. Every one of them
+   carries a title/aria-label at the call site. */
+button.icon {
+  position: relative;
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  padding: 0;
+  font-size: 0.875rem;
+  line-height: 1;
+  flex: none;
+}
+button.icon::after {
+  content: '';
+  position: absolute;
+  inset: -8px;
+}
+
+input,
+select {
+  width: 100%;
+  height: 40px;
+  padding: 0 var(--s3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: 400 0.9375rem/1.4 var(--font-body);
+  transition: border-color var(--d-fast) var(--ease-standard);
+}
+input::placeholder {
+  color: var(--ink-3);
+}
+select {
+  padding-right: var(--s2);
+}
+/* Paths, ids and filters are measured things, not prose. */
+input.mono {
+  font: 400 0.8125rem/1.4 var(--font-mono);
+}
+
+/* ============================================================================
+   STATUS DOT (DESIGN.md §4) — 6px dot plus a readout label, 8px apart.
+   Never the dot alone: colour never carries the meaning by itself.
+   ============================================================================ */
+
+.status {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  flex: none;
+  color: var(--ink-2);
+  font: 500 0.75rem/1.3 var(--font-mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.status > .dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--ink-3);
+}
+.status-running > .dot {
+  background: var(--success);
+  animation: dot-pulse 1.6s var(--ease-standard) infinite;
+}
+.status-idle > .dot {
+  background: var(--ink-3);
+}
+.status-waiting > .dot {
+  background: var(--warning);
+}
+.status-exited > .dot {
+  background: var(--danger);
+}
+
+@keyframes dot-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Context occupancy. The number is the label — colour is the second channel. */
+.ctx {
+  font: 450 0.875rem/1.45 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  text-transform: none;
+  cursor: help;
+}
+.ctx-healthy > .dot {
+  background: var(--success);
+}
+.ctx-watch > .dot {
+  background: var(--warning);
+}
+.ctx-handoff > .dot {
+  background: var(--danger);
+}
+
+/* Badge / tag: radius sm, 22px, readout type, wash fill. */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  height: 22px;
+  padding: 0 var(--s2);
+  border-radius: var(--r-sm);
+  background: var(--accent-wash);
+  color: var(--accent);
+  font: 500 0.75rem/1 var(--font-mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.tag-warning {
+  background: var(--warning-wash);
+  color: var(--warning);
+}
+.tag-danger {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+.tag-neutral {
+  background: var(--surface-2);
+  color: var(--ink-3);
+}
+
+/* ============================================================================
+   APP SHELL
+   ============================================================================ */
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: var(--canvas);
+  overflow: hidden;
+}
+
+/* ---- banner = the nav bar: surface-1, 64px, bottom hairline, no shadow ---- */
+
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  height: 64px;
+  flex: none;
+  padding: 0 var(--s5);
+  background: var(--surface-1);
+  border-bottom: 1px solid var(--hairline);
+}
+
+/* Wordmark lockup: a 20px brass glyph, 10px, then the name in the display
+   face. The glyph is the only brass in the bar. */
+.wordmark {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+.wordmark svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+  color: var(--accent-fill);
+}
+.wordmark-name {
+  font: 600 1.0625rem/1 var(--font-display);
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+.banner-tag {
+  color: var(--ink-3);
+  font: 400 0.875rem/1.55 var(--font-body);
+}
+
+/* ---- sidebar ------------------------------------------------------------ */
+
+.body-row {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  background: var(--canvas);
+}
+
+.sidebar {
+  width: 240px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: var(--surface-1);
+  border-right: 1px solid var(--hairline);
+}
+.sidebar.rail {
+  width: 56px;
+  align-items: center;
+  gap: var(--s2);
+  padding: var(--s3) 0;
+}
+.sidebar > header {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  padding: var(--s4) var(--s4) var(--s3);
+}
+.sidebar > header .readout-rule {
+  flex: 1;
+  min-width: 0;
+}
+.new-ws {
+  margin: 0 var(--s4) var(--s4);
+  width: calc(100% - var(--s4) * 2);
+}
+
+.rail-ws {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--r-md);
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-2);
+  font: 500 0.75rem/1 var(--font-mono);
+  letter-spacing: 0.06em;
+}
+.rail-ws.active {
+  background: var(--accent-wash);
+  color: var(--ink);
+  border-color: transparent;
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+.rail-ws .attention {
+  position: absolute;
+  top: 7px;
+  right: 7px;
+}
+
+.ws-list,
+.session-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.ws {
+  border-top: 1px solid var(--hairline);
+  padding-bottom: var(--s2);
+}
+.ws:first-child {
+  border-top: none;
+}
+.ws-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s1);
+  padding: var(--s2) var(--s3) var(--s2) var(--s2);
+  border-left: 2px solid transparent;
+}
+/* Selected row treatment from the table spec: accent-wash plus a 2px brass
+   left edge. This is the sidebar's only brass. */
+.ws.active > .ws-head {
+  background: var(--accent-wash);
+  border-left-color: var(--accent);
+}
+.ws-name {
+  flex: 1;
+  min-width: 0;
+  height: 28px;
+  padding: 0 var(--s1);
+  justify-content: flex-start;
+  gap: var(--s2);
+  background: none;
+  border-color: transparent;
+  color: var(--ink-2);
+  font: 500 0.8125rem/1.4 var(--font-body);
+  overflow: hidden;
+}
+.ws.active .ws-name {
+  color: var(--ink);
+}
+.ws-name > .name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fold {
+  width: 20px;
+  min-width: 20px;
+  height: 28px;
+  padding: 0;
+  background: none;
+  border-color: transparent;
+  color: var(--ink-3);
+  font-size: 0.6875rem;
+  flex: none;
+}
+
+/* Attention marker: the status dot, 6px, in warning. Its label is carried by
+   the banner counter and by the row's own status badge. */
+.attention {
+  display: inline-block;
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--r-full);
+  background: var(--warning);
+}
+
+.session-rows li {
+  display: flex;
+  align-items: center;
+  padding-left: var(--s5);
+  border-left: 2px solid transparent;
+}
+@media (hover: hover) {
+  .session-rows li:hover {
+    background: var(--surface-2);
+  }
+}
+.session-row {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  justify-content: flex-start;
+  gap: var(--s2);
+  padding: 0 var(--s1);
+  background: none;
+  border-color: transparent;
+  color: var(--ink-2);
+  font: 400 0.875rem/1.55 var(--font-body);
+}
+.session-row .name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+/* The label stays even in a 240px rail: a bare dot would make colour the only
+   channel, which the system forbids. The name yields the width instead. */
+.session-row .status {
+  font-size: 0.6875rem;
+}
+.empty {
+  padding: var(--s1) var(--s4) var(--s2) var(--s5);
+  color: var(--ink-3);
+  font: 400 0.875rem/1.55 var(--font-body);
+}
+
+/* ---- toolbar ------------------------------------------------------------ */
+
+.main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  background: var(--canvas);
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex: none;
+  padding: var(--s3) var(--s4);
+  border-bottom: 1px solid var(--hairline);
+}
+.ws-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.ws-title {
+  font: 600 1.5rem/1.2 var(--font-display);
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ws-cwd {
+  font: 450 0.75rem/1.3 var(--font-mono);
+  color: var(--ink-3);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Segmented control: one bordered group, active half on accent-wash. */
+.segmented {
+  display: inline-flex;
+  flex: none;
+  padding: 2px;
+  gap: 2px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+  background: var(--surface-2);
+}
+.segmented button {
+  height: 28px;
+  padding: 0 var(--s3);
+  border-color: transparent;
+  background: transparent;
+  border-radius: var(--r-sm);
+  color: var(--ink-3);
+  font: 500 0.75rem/1 var(--font-mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+@media (hover: hover) {
+  .segmented button:hover:not(:disabled) {
+    background: transparent;
+    border-color: transparent;
+    color: var(--ink-2);
+  }
+}
+.segmented button.on {
+  background: var(--accent-wash);
+  color: var(--ink);
+}
+
+.terminals {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--s2);
+  flex: none;
+}
+.terminals > span {
+  color: var(--ink-3);
+  font: 500 0.75rem/1.3 var(--font-mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.terminals select {
+  width: auto;
+  height: 32px;
+  font: 450 0.875rem/1 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.stage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  padding: var(--s3);
+}
+
+/* ---- layout splits ------------------------------------------------------ */
+
+.split {
+  display: flex;
+  width: 100%;
+  height: 100%;
+}
+.split-row {
+  flex-direction: row;
+}
+.split-col {
+  flex-direction: column;
+}
+.split-child {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+.split-child > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+.divider {
+  position: absolute;
+  z-index: 5;
+  background: transparent;
+  transition: background-color var(--d-fast) var(--ease-standard);
+}
+@media (hover: hover) {
+  .divider:hover {
+    background: var(--accent-wash);
+  }
+}
+.divider-row {
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+}
+.divider-col {
+  left: 0;
+  bottom: -3px;
+  height: 6px;
+  width: 100%;
+  cursor: row-resize;
+}
+
+.pane-slot {
+  display: flex;
+  padding: var(--s1);
+  min-width: 0;
+  min-height: 0;
+  container-type: inline-size;
+}
+.pane-slot > * {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+/* ============================================================================
+   PANE — DESIGN.md §4, "Terminal / pane block"
+
+   The pane card is surface-1; the terminal inside it is `canvas`, one step
+   DARKER than its parent — inset, not raised. Its header is a readout rule.
+   The pane you are typing into gains a 2px brass left edge and hairline-strong
+   on the other three sides; the 2px is always reserved so focus costs no
+   layout shift. This replaces the eight rotating catalog tints.
+   ============================================================================ */
+
+.pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-left: 2px solid var(--hairline);
+  border-radius: var(--r-md);
+  transition: border-color var(--d-base) var(--ease-standard);
+}
+.pane:focus-within {
+  border-color: var(--hairline-strong);
+  border-left-color: var(--accent);
+}
+.pane.maximized {
+  position: absolute;
+  inset: var(--s2);
+  z-index: 20;
+  border-color: var(--hairline-strong);
+  border-left-color: var(--accent);
+}
+/* A maximized pane must fill the stage — the terminal work area — and nothing
+   more, overlaying its siblings but never the sidebar, header or toolbar. It is
+   absolutely positioned, so it anchors to the nearest ancestor that is a
+   containing block. Left alone that is its own layout cell (`.split-child` is
+   relative; `.pane-slot`/`.tab-pane` are size containers, which also contain
+   absolutes), so "maximize" would either do nothing or, once those cells are
+   sized oddly, spill past the stage. Neutralize those cells while maximized so
+   the pane anchors to `.stage`, which is the one intended containing block. */
+.stage.has-max .split-child {
+  position: static;
+}
+.stage.has-max .pane-slot,
+.stage.has-max .tab-pane {
+  container-type: normal;
+}
+
+/* The header is the readout rule: engraved label flush left, measurements
+   right, hairline-strong underneath doing the rule's job. */
+.pane-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex: none;
+  padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--hairline-strong);
+  transition: background-color var(--d-base) var(--ease-standard);
+}
+/* An agent blocked on a human tints its own header. The words are still
+   carried by the status badge beside it. */
+.pane.needs-you > .pane-head {
+  background: var(--warning-wash);
+}
+.pane-name {
+  min-width: 0;
+  max-width: 44%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-3);
+  font: 500 0.75rem/1.3 var(--font-mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.pane:focus-within .pane-name,
+.pane.maximized .pane-name {
+  color: var(--ink-2);
+}
+
+/* The display surface. Canvas, inset into the surface-1 card. */
+.term-host {
+  flex: 1;
+  min-height: 0;
+  margin: var(--s2);
+  padding: var(--s3);
+  /* Held at the dark canvas in both colour schemes: `devin` draws its TUI
+     light-on-dark and cannot be asked for a light rendering. See theme.ts. */
+  background: #0b0f14;
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+}
+
+/* ============================================================================
+   LAUNCHER — the empty-slot front panel
+   ============================================================================ */
+
+.launcher {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  overflow: auto;
+  min-width: 0;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+}
+.launcher-inner {
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+  padding: var(--s6) var(--s5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+}
+.launcher-head {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+.launcher-title {
+  font: 600 1.5rem/1.2 var(--font-display);
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  margin: 0;
+}
+.launcher-lede {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--ink-2);
+  font: 400 0.9375rem/1.65 var(--font-body);
+}
+.launcher-fields {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s4);
+}
+.launcher-actions {
+  display: flex;
+  gap: var(--s2);
+  flex-wrap: wrap;
+}
+.launcher-hint {
+  margin: 0;
+  color: var(--ink-3);
+  font: 400 0.875rem/1.55 var(--font-body);
+}
+.launcher-hint code {
+  color: var(--ink-2);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  padding: 1px 5px;
+}
+
+/* A six-way split leaves a pane barely 300px wide. The panel sheds its prose
+   and its air first, and keeps the fields and the actions — those are the
+   things the screen exists for. */
+@container (max-width: 420px) {
+  .launcher-inner {
+    padding: var(--s4);
+    gap: var(--s4);
+  }
+  .launcher-lede {
+    display: none;
+  }
+  .launcher-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+@container (max-width: 320px) {
+  .launcher-title {
+    display: none;
+  }
+  .launcher-hint {
+    display: none;
+  }
+}
+
+/* ---- fields: label above, never a placeholder standing in for one -------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  min-width: 0;
+}
+.field > span {
+  color: var(--ink-2);
+  font: 500 0.8125rem/1.4 var(--font-body);
+  letter-spacing: 0.005em;
+}
+.field small {
+  color: var(--ink-3);
+  font: 400 0.875rem/1.55 var(--font-body);
+}
+.field code,
+.session-picker code,
+.guide-card code,
+.modal code {
+  font: 400 0.8125rem/1.7 var(--font-mono);
+  color: var(--ink-2);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  padding: 1px 5px;
+}
+
+/* ---- tabs --------------------------------------------------------------- */
+
+.tabs-view {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  container-type: inline-size;
+}
+.tab-strip {
+  display: flex;
+  gap: var(--s5);
+  flex: none;
+  padding: 0 var(--s2);
+  overflow-x: auto;
+  border-bottom: 1px solid var(--hairline);
+}
+/* Nav spec: the active item is ink with a 2px brass underline sitting on the
+   strip's bottom hairline. */
+.tab {
+  position: relative;
+  height: 40px;
+  padding: 0;
+  gap: var(--s2);
+  background: none;
+  border: none;
+  border-radius: 0;
+  color: var(--ink-3);
+  font: 500 0.8125rem/1.4 var(--font-body);
+}
+@media (hover: hover) {
+  .tab:hover:not(:disabled) {
+    background: none;
+    border: none;
+    color: var(--ink-2);
+  }
+}
+.tab.active {
+  color: var(--ink);
+}
+.tab.active::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -1px;
+  height: 2px;
+  background: var(--accent);
+}
+.tab .status {
+  font-size: 0.6875rem;
+}
+.tab-body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  display: flex;
+  padding: var(--s3) 0 0;
+}
+.tab-pane {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  container-type: inline-size;
+}
+.tab-pane > * {
+  flex: 1;
+}
+[hidden] {
+  display: none !important;
+}
+
+/* ============================================================================
+   MODALS — surface-1, radius lg, modal shadow, overlay scrim.
+   Enter with opacity 0→1 and translateY(8px→0). Never scale in.
+   ============================================================================ */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s5);
+  background: var(--overlay);
+  animation: fade-in var(--d-base) var(--ease-entrance) both;
+}
+.modal {
+  width: min(760px, 100%);
+  max-height: 84vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+  padding: var(--s5);
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-modal);
+  animation: rise-in var(--d-base) var(--ease-entrance) both;
+}
+.modal.card {
+  width: min(480px, 100%);
+}
+.modal > header {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+}
+.modal h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: 600 1.5rem/1.2 var(--font-display);
+  letter-spacing: -0.015em;
+}
+.modal > footer {
+  color: var(--ink-3);
+  font: 400 0.875rem/1.55 var(--font-body);
+  max-width: 68ch;
+}
+.card-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--s2);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ---- session picker: a dense table ------------------------------------- */
+
+.session-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--hairline-strong);
+}
+.session-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  min-height: 44px;
+  padding: var(--s2) var(--s3);
+  border-bottom: 1px solid var(--hairline);
+  border-radius: var(--r-none);
+  transition: background-color var(--d-fast) var(--ease-standard);
+}
+@media (hover: hover) {
+  .session-list li:hover {
+    background: var(--surface-3);
+  }
+}
+.session-list li.locked {
+  color: var(--ink-3);
+}
+.session-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.session-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 0.9375rem/1.4 var(--font-body);
+}
+.session-list li.locked .session-title {
+  color: var(--ink-3);
+}
+.session-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  min-width: 0;
+  color: var(--ink-3);
+  font: 450 0.75rem/1.45 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.session-meta > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-meta code {
+  flex: none;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--ink-2);
+  font-size: 0.75rem;
+}
+.session-actions {
+  display: flex;
+  gap: var(--s2);
+  flex: none;
+}
+/* No brass in the list: a screen carries six brass appearances at most, and a
+   list of forty sessions would carry forty. Resume is a secondary. */
+.session-actions button {
+  height: 32px;
+  padding: 0 var(--s3);
+}
+
+/* ---- guide: instrument cards ------------------------------------------- */
+
+.modal.guide {
+  width: min(880px, 100%);
+  max-height: 88vh;
+}
+.guide-lede {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--ink-2);
+  font: 400 1.0625rem/1.6 var(--font-body);
+}
+.guide-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: var(--s4);
+}
+.guide-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  padding: var(--s5);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+}
+.guide-card-body {
+  margin: 0;
+  color: var(--ink-2);
+  font: 400 0.875rem/1.55 var(--font-body);
+}
+.guide-card-body b {
+  color: var(--ink);
+  font-weight: 500;
+}
+
+/* ---- trace panel: a floating sheet -------------------------------------- */
+
+.trace {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  width: min(600px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border-left: 1px solid var(--hairline);
+  box-shadow: var(--shadow-overlay);
+  animation: fade-in var(--d-base) var(--ease-entrance) both;
+}
+.trace > header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  flex: none;
+  padding: var(--s5) var(--s5) var(--s4);
+  border-bottom: 1px solid var(--hairline);
+}
+.trace-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+}
+.trace h3 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: 600 1.125rem/1.35 var(--font-body);
+  letter-spacing: -0.008em;
+  overflow-wrap: anywhere;
+}
+/* Replaces the round award seal: the numbers themselves, in data type. */
+.trace-metrics {
+  display: flex;
+  gap: var(--s6);
+}
+.metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.metric-label {
+  color: var(--ink-3);
+  font: 500 0.75rem/1.3 var(--font-mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.metric-value {
+  color: var(--ink);
+  font: 450 1.125rem/1.2 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.metric-value.failed {
+  color: var(--danger);
+}
+.trace-status {
+  padding: var(--s4) var(--s5) 0;
+}
+.trace-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--s5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s5);
+}
+
+.turn {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding-left: var(--s3);
+  border-left: 2px solid var(--hairline);
+}
+.turn-agent {
+  border-left-color: var(--hairline-strong);
+}
+.turn-role {
+  color: var(--ink-3);
+  font: 500 0.75rem/1.3 var(--font-mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.turn pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink-2);
+  font: 400 0.875rem/1.55 var(--font-body);
+}
+/* A prompt is quoted material: it gets its own surface so the reply doesn't. */
+.turn-user pre {
+  padding: var(--s3);
+  background: var(--surface-2);
+  border-radius: var(--r-sm);
+  color: var(--ink);
+}
+.thinking {
+  color: var(--ink-3) !important;
+  font-style: italic;
+}
+
+.tool {
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background: var(--surface-2);
+}
+.tool-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--s3);
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  color: var(--ink-2);
+  text-align: left;
+}
+@media (hover: hover) {
+  .tool-head:hover:not(:disabled) {
+    background: var(--surface-3);
+    border: none;
+  }
+}
+.tool-kind {
+  flex: none;
+  width: 44px;
+  color: var(--ink-3);
+  font: 500 0.6875rem/1.3 var(--font-mono);
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.tool-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: 400 0.875rem/1.55 var(--font-body);
+  color: var(--ink);
+}
+.tool-status.s-completed > .dot {
+  background: var(--success);
+}
+.tool-status.s-failed > .dot {
+  background: var(--danger);
+}
+.tool-status.s-in_progress > .dot {
+  background: var(--info);
+}
+.tool-status.s-pending > .dot {
+  background: var(--ink-3);
+}
+.tool-status {
+  flex: none;
+  font-size: 0.6875rem;
+}
+.duration {
+  flex: none;
+  color: var(--ink-3);
+  font: 450 0.75rem/1.45 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+.tool-body {
+  padding: var(--s3);
+  border-top: 1px solid var(--hairline);
+  background: var(--surface-1);
+}
+.block-text {
+  margin: 0;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  color: var(--ink-2);
+  font: 400 0.8125rem/1.7 var(--font-mono);
+}
+.diff {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s1);
+}
+.diff-path {
+  color: var(--ink);
+  font: 450 0.75rem/1.45 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.diff pre {
+  margin: 0;
+  max-height: 200px;
+  overflow: auto;
+  padding: var(--s2) var(--s3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-left: 2px solid var(--hairline-strong);
+  font: 400 0.8125rem/1.7 var(--font-mono);
+}
+.diff .del {
+  background: var(--danger-wash);
+  border-left-color: var(--danger);
+  color: var(--ink-2);
+}
+.diff .add {
+  background: var(--success-wash);
+  border-left-color: var(--success);
+  color: var(--ink-2);
+}
+
+/* ============================================================================
+   EMPTY STATE — centred, per §5. One brass button, one secondary.
+   ============================================================================ */
+
+.empty-state {
+  margin: auto;
+  max-width: 560px;
+  padding: var(--s8) var(--s5);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--s5);
+  text-align: center;
+}
+.empty-state .readout-rule {
+  width: 100%;
+}
+.empty-state h1 {
+  margin: 0;
+  font: 600 clamp(1.75rem, 3vw, 2.5rem) / 1.12 var(--font-display);
+  letter-spacing: -0.022em;
+}
+.empty-state p {
+  margin: 0;
+  max-width: 68ch;
+  color: var(--ink-2);
+  font: 400 1.0625rem/1.6 var(--font-body);
+}
+.empty-actions {
+  display: flex;
+  gap: var(--s3);
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ---- footer ------------------------------------------------------------- */
+
+.footer-band {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex: none;
+  height: 40px;
+  padding: 0 var(--s5);
+  background: var(--surface-1);
+  border-top: 1px solid var(--hairline);
+  color: var(--ink-3);
+  font: 400 0.875rem/1.55 var(--font-body);
+}
+
+/* ============================================================================
+   MOTION & RESPONSIVE
+   ============================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 90ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 90ms !important;
+    transition-property: opacity, background-color, border-color, color !important;
+  }
+  *,
+  *:hover {
+    transform: none !important;
+  }
+  .status-running > .dot {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+@media (max-width: 1023px) {
+  .banner {
+    padding: 0 var(--s4);
+  }
+  .banner-tag {
+    display: none;
+  }
+  .sidebar {
+    width: 200px;
+  }
+}
+@media (max-width: 639px) {
+  .banner {
+    gap: var(--s3);
+  }
+  .sidebar {
+    display: none;
+  }
+  .toolbar {
+    gap: var(--s3);
+    padding: var(--s3);
+  }
+  .stage {
+    padding: var(--s2);
+  }
+  .modal-backdrop {
+    padding: var(--s3);
+  }
+  .trace,
+  .card-detail {
+    width: 100vw;
+  }
+  .board-bar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: var(--s2);
+    padding-inline: var(--s3);
+  }
+  .board-bar > .dim,
+  .board-bar > .error {
+    flex: 1 0 100%;
+  }
+  .board-bar > .spacer {
+    display: none;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  .kard,
+  button.secondary {
+    background-color: #ffffff;
+    color: #0b0f14;
+  }
+  .kard .dim,
+  .kard .kard-desc,
+  .kard .kard-cwd {
+    color: #4a5665;
+  }
+}
+
+/* ============================================================================
+   KANBAN BOARD — the terminal-free way to work.
+
+   A column per lifecycle stage; a card per ticket. Depth comes from the surface
+   system exactly as the panes do: canvas board, surface-1 columns, surface-2
+   cards, one brass edge on the card you are hovering. Attention is the only
+   column that carries a warning colour, because a card there is blocked on you.
+   ============================================================================ */
+
+.board-wrap {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--canvas);
+}
+
+/* The board's own action row — count, one-line explainer, New ticket. Sits
+   under the workspace toolbar, so it is lighter than one: no bottom hairline. */
+.board-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex: none;
+  padding: var(--s3) var(--s4) 0;
+}
+
+.board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: var(--s3);
+  padding: var(--s4);
+  overflow-x: auto;
+}
+
+.board-col {
+  flex: 1 1 0;
+  min-width: 260px;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  transition: border-color var(--d-fast) var(--ease-standard);
+}
+.board-col.drop-target {
+  border-color: var(--accent-edge);
+}
+.board-col.col-attention {
+  box-shadow: inset 0 2px 0 var(--warning-wash);
+}
+
+.board-col-head {
+  flex: none;
+  padding: var(--s3) var(--s3) var(--s2);
+  border-bottom: 1px solid var(--hairline);
+}
+
+.board-col-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--s3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+}
+
+.board-col-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s5) var(--s3);
+  text-align: center;
+}
+
+/* ---- card tile ---------------------------------------------------------- */
+
+.kard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s2);
+  padding: var(--s3);
+  background: var(--surface-2);
+  border: 1px solid var(--hairline);
+  border-left: 3px solid transparent;
+  border-radius: var(--r-md);
+  cursor: pointer;
+  transition:
+    border-color var(--d-fast) var(--ease-standard),
+    background var(--d-fast) var(--ease-standard);
+}
+@media (hover: hover) {
+  .kard:hover {
+    border-left-color: var(--accent);
+    background: var(--surface-3);
+  }
+}
+.kard.needs-you {
+  border-left-color: var(--warning);
+}
+
+.kard-head {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+}
+.kard-title {
+  margin: 0;
+  font: 500 0.9375rem/1.35 var(--font-body);
+  letter-spacing: -0.006em;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.kard-desc {
+  margin: 0;
+  color: var(--ink-3);
+  font: 400 0.8125rem/1.5 var(--font-body);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.kard-foot {
+  display: flex;
+  align-items: center;
+  gap: var(--s2);
+  margin-top: var(--s1);
+}
+.kard-cwd {
+  color: var(--ink-3);
+  font: 450 0.75rem/1.3 var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+/* Compact row actions inside a card, still with a full hit area via ::after. */
+button.tiny {
+  height: 24px;
+  padding: 0 var(--s2);
+  font-size: 0.75rem;
+}
+button.icon.tiny {
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
+}
+
+/* ---- ticket dialog ------------------------------------------------------ */
+
+.card-dialog {
+  width: min(560px, 100%);
+}
+textarea {
+  width: 100%;
+  padding: var(--s3);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-sm);
+  background: var(--surface-2);
+  color: var(--ink);
+  font: 400 0.9375rem/1.55 var(--font-body);
+  resize: vertical;
+  transition: border-color var(--d-fast) var(--ease-standard);
+}
+textarea::placeholder {
+  color: var(--ink-3);
+}
+textarea:focus-visible {
+  outline: none;
+  border-color: var(--focus-ring);
+  box-shadow: var(--ring);
+}
+
+/* ---- ticket detail sheet ------------------------------------------------ */
+
+.card-detail {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  width: min(720px, 100vw);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface-1);
+  border-left: 1px solid var(--hairline);
+  box-shadow: var(--shadow-overlay);
+  animation: fade-in var(--d-base) var(--ease-entrance) both;
+}
+.card-detail > header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--s3);
+  flex: none;
+  padding: var(--s5) var(--s5) var(--s4);
+  border-bottom: 1px solid var(--hairline);
+}
+.card-detail-title-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--s3);
+}
+.card-detail h3 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font: 600 1.125rem/1.35 var(--font-body);
+  letter-spacing: -0.008em;
+  overflow-wrap: anywhere;
+}
+.card-detail-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--s4);
+  flex-wrap: wrap;
+}
+.card-detail-cwd {
+  color: var(--ink-3);
+  font: 450 0.75rem/1.3 var(--font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.card-prompt-panel {
+  flex: none;
+  border-bottom: 1px solid var(--hairline);
+}
+.card-prompt-toggle {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 36px;
+  padding: 0 var(--s5);
+  background: none;
+  border: none;
+  border-radius: 0;
+}
+.card-prompt-toggle .rule-label {
+  color: var(--ink-2);
+}
+.card-prompt-text {
+  margin: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  padding: 0 var(--s5) var(--s4);
+  color: var(--ink-2);
+  font: 400 0.8125rem/1.6 var(--font-mono);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.card-detail-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+.card-term {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+}
+.card-term > * {
+  flex: 1;
+  min-width: 0;
+}
+.card-detail-empty {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--s6);
+  text-align: center;
+  color: var(--ink-3);
+}
+.card-detail-empty p {
+  max-width: 42ch;
+}
+
+.card-detail-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex: none;
+  padding: var(--s4) var(--s5);
+  border-top: 1px solid var(--hairline);
+}
+
+/* Keep retained terminal scrollback bounded beside its recovery controls. */
+.pane-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+.pane-content > .term-host { overflow: hidden; }
+.pane-recovery {
+  display: flex;
+  align-items: center;
+  gap: var(--s3);
+  flex: none;
+  max-height: 40%;
+  overflow: auto;
+  padding: var(--s2) var(--s3);
+  border-top: 1px solid var(--hairline);
+}
+.pane-recovery p { flex: 1; margin: 0; }
+.pane-recovery button { flex: none; }
+
+.stage > .pane-slot { height: 100%; overflow: hidden; }

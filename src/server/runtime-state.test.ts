@@ -1,0 +1,47 @@
+import { describe, expect, it } from 'vitest';
+import { RuntimeState } from './runtime-state.js';
+import { emptyState } from '../core/models.js';
+import { createWorkspace } from '../core/workspace.js';
+import { createCard, markStarted, moveCard } from '../core/board.js';
+const route = { modelId: 'fast', model: 'openai/demo', provider: 'openai', complexity: 'simple' as const, reason: 'small' };
+describe('authoritative runtime replay', () => {
+  it('replays pending, route, verified identity and detached completion into stale saves', () => {
+    const runtime = new RuntimeState();
+    let state = createWorkspace(emptyState(), 'test', '/tmp');
+    const ws = state.activeWorkspaceId!;
+    const card = createCard(state, ws, { title: 'task', description: 'work', cwd: '/tmp', agent: 'codex' });
+    state = markStarted(card.state, ws, card.id, 'p');
+    runtime.record({ t: 'pane:starting', paneId: 'p', routing: true });
+    expect(runtime.messages('p')).toContainEqual({ t: 'pane:starting', paneId: 'p', routing: true });
+    runtime.record({ t: 'pane:route', paneId: 'p', route });
+    runtime.record({ t: 'pane:spawned', paneId: 'p' });
+    expect(runtime.messages('p').some(m => m.t === 'pane:starting')).toBe(false);
+    runtime.record({ t: 'pane:codex-session', paneId: 'p', codexSessionId: 'uuid' });
+    runtime.record({ t: 'pane:status', paneId: 'p', status: 'idle' });
+    runtime.record({ t: 'pane:outcome', paneId: 'p', outcome: 'completed' });
+    expect(runtime.reconcile(state).workspaces[ws]?.cards[card.id]).toMatchObject({ route, codexSessionId: 'uuid', column: 'done' });
+    runtime.record({ t: 'pane:status', paneId: 'p', status: 'running' });
+    expect(runtime.messages('p').some(m => m.t === 'pane:outcome')).toBe(false);
+    expect(runtime.reconcile(state).workspaces[ws]?.cards[card.id]?.column).toBe('in-progress');
+    runtime.record({ t: 'pane:status', paneId: 'p', status: 'waiting' });
+    expect(runtime.messages('p')).toContainEqual(expect.objectContaining({ t: 'pane:status', paneId: 'p', status: 'waiting' }));
+    runtime.record({ t: 'pane:status', paneId: 'p', status: 'interrupted' });
+    expect(runtime.reconcile(state).workspaces[ws]?.cards[card.id]?.column).toBe('attention');
+    runtime.record({ t: 'pane:status', paneId: 'p', status: 'running' });
+    runtime.record({ t: 'pane:status', paneId: 'p', status: 'idle' });
+    runtime.record({ t: 'pane:outcome', paneId: 'p', outcome: 'completed' });
+    expect(runtime.reconcile(state).workspaces[ws]?.cards[card.id]?.column).toBe('done');
+    const saved = runtime.reconcile(state);
+    const reopened = moveCard(saved, ws, card.id, 'backlog');
+    expect(runtime.reconcile(reopened).workspaces[ws]?.cards[card.id]?.column).toBe('backlog');
+    runtime.record({ t: 'pane:status', paneId: 'p', status: 'running' });
+    expect(runtime.reconcile(reopened).workspaces[ws]?.cards[card.id]?.column).toBe('in-progress');
+
+    runtime.record({ t: 'pane:starting', paneId: 'p', routing: true });
+    runtime.record({ t: 'pane:spawned', paneId: 'p' });
+    const retried = runtime.reconcile(saved).workspaces[ws]?.cards[card.id];
+    expect(retried?.codexSessionId).toBeUndefined();
+    expect(retried?.route).toBeUndefined();
+    expect(runtime.messages('p').some(m => m.t === 'pane:outcome')).toBe(false);
+  });
+});

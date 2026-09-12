@@ -1,0 +1,301 @@
+import { openRouterApiKey } from './env.js';
+/**
+ * Pane supervisor — the PTY half. One `devin` TUI per pane, exactly as the user
+ * would run it in a terminal, with two additions the app needs:
+ *
+ *   --config <merged>   our status hooks, merged into the user's own config
+ *   --export <path>     the live transcript context-health reads
+ *
+ * Everything else about the session is Devin's own UX: slash commands, the
+ * permission dialog, /model. That is the whole point of keeping panes on a PTY
+ * rather than driving them over ACP.
+ */
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { homedir, platform } from 'node:os';
+import { join } from 'node:path';
+import type { IPty } from 'node-pty';
+import { spawn as ptySpawn } from 'node-pty';
+import { buildDevinLaunch, shellLaunchArgs } from '../core/launch.js';
+import { buildCodexArgs } from '../core/codex-launch.js';
+import { codexHookScriptSource } from '../core/codex-hooks.js';
+import { composeSessionConfig, devinStatusHooks, hookScriptSource } from '../core/hooks.js';
+import { OscScanner, type CodexEvent, type OscSignal } from '../core/osc.js';
+import type { DevinPermissionMode } from '../core/models.js';
+import type { RouteDecision } from '../core/routing.js';
+import { resolveContextApiKey } from '../core/mcp.js';
+import { buildPaneConfigDir, readUserMcpConfig, userDevinDir } from './devin-config-dir.js';
+import type { FileStore } from './store.js';
+import { resolveCwd } from './paths.js';
+import { buildCodexConfigEntries } from './codex-config.js';
+
+const isWindows = platform() === 'win32';
+
+/**
+ * How much recent PTY output to keep per pane so a terminal that (re)attaches
+ * can be repainted. A client attaches whenever its TerminalPane mounts — on a
+ * workspace switch, a grid re-render, or a full page reload — and the PTY it
+ * points at has been running the whole time. Without a replayable buffer the
+ * fresh xterm would show nothing until the next byte arrived, which reads as
+ * "the session lost its state". `devin` runs in the alternate screen and
+ * redraws often, so a front-trimmed byte window repaints cleanly in practice.
+ */
+const MAX_BUFFER_BYTES = 256 * 1024;
+
+export interface SpawnOptions {
+  paneId: string;
+  cwd: string;
+  cols: number;
+  rows: number;
+  model?: string;
+  /** Missing means the legacy Devin path. */
+  agent?: 'devin' | 'codex';
+  route?: RouteDecision;
+  permissionMode: DevinPermissionMode;
+  prompt?: string;
+  resumeSessionId?: string;
+  /** Launch a plain shell instead of devin — the escape hatch pane. */
+  shellOnly?: boolean;
+  /** The owning workspace's context.dev key; falls back to CONTEXT_DEV_API_KEY. */
+  contextApiKey?: string;
+}
+
+export interface PaneHandle {
+  paneId: string;
+  pty: IPty;
+  exportPath?: string;
+}
+
+type OnData = (paneId: string, data: string) => void;
+type OnSignal = (paneId: string, signal: OscSignal) => void;
+export type OnCodexEvent = (paneId: string, event: CodexEvent) => void;
+type OnExit = (paneId: string, code: number) => void;
+
+/** Where devin keeps the user's own config — the base we merge hooks into. */
+function userConfigPath(): string {
+  return process.env.DEVIN_CONFIG || join(userDevinDir(), 'config.json');
+}
+
+export class PaneSupervisor {
+  private panes = new Map<string, PaneHandle>();
+  private scanners = new Map<string, OscScanner>();
+  /**
+   * Recent output per pane, replayed on attach. Kept separate from `panes` so
+   * it survives a natural exit — a reattaching terminal should still show the
+   * final screen and the "[process exited]" line, not go blank.
+   */
+  private buffers = new Map<string, string>();
+
+  constructor(
+    private store: FileStore,
+    private handlers: { onData: OnData; onSignal: OnSignal; onCodexEvent?: OnCodexEvent; onExit: OnExit },
+  ) {}
+
+  /**
+   * Build the per-pane devin config directory.
+   *
+   * Two things have to be per-pane, and they need two different mechanisms:
+   *
+   *   hooks -> `--config`, which REPLACES the user config rather than layering
+   *     onto it. So the merge must start from the user's own file or the pane
+   *     launches without their org_id, model default and permission allowlist.
+   *   MCP   -> `XDG_CONFIG_HOME`, because `--config` does not carry MCP servers
+   *     at all. See devin-config-dir.ts and core/mcp.ts.
+   *
+   * A missing or corrupt user config degrades to hooks-only, which fails
+   * visibly at the Devin prompt instead of silently.
+   */
+  private writePaneConfig(paneId: string, contextApiKey?: string) {
+    const scriptPath = this.store.ensureHookScript(hookScriptSource());
+    let userConfig: unknown = null;
+    try {
+      userConfig = JSON.parse(readFileSync(userConfigPath(), 'utf8'));
+    } catch {
+      console.warn('[panes] no readable devin user config; launching with hooks only');
+    }
+    const sessionConfig = composeSessionConfig(userConfig, devinStatusHooks(scriptPath));
+
+    const dir = this.store.paneDir(paneId);
+    mkdirSync(dir, { recursive: true });
+
+    return buildPaneConfigDir(dir, {
+      sessionConfig,
+      // The workspace's key, or the .env default that makes context.dev a
+      // default rather than something each workspace opts into.
+      contextApiKey: resolveContextApiKey(contextApiKey, process.env.CONTEXT_DEV_API_KEY),
+      userMcpConfig: readUserMcpConfig(),
+    });
+  }
+
+  /**
+   * Launch a pane. Returns null when the directory is unusable — the caller has
+   * nothing to supervise, and the pane has already been told why.
+   */
+  spawn(opts: SpawnOptions): PaneHandle | null {
+    this.kill(opts.paneId);
+    this.buffers.delete(opts.paneId);
+
+    // Validate BEFORE spawning. node-pty reports a bad cwd as a bare exit code 1
+    // with no output, which is indistinguishable from `devin` itself crashing.
+    const cwd = resolveCwd(opts.cwd, homedir());
+    if (!cwd || !existsSync(cwd) || !statSync(cwd).isDirectory()) {
+      this.emit(
+        opts.paneId,
+        `\r\n\x1b[1;31mCannot start here.\x1b[0m\r\n` +
+          `  \x1b[2mworking directory:\x1b[0m ${opts.cwd}\r\n` +
+          `  \x1b[2mresolved to:\x1b[0m       ${cwd || '(empty)'}\r\n\r\n` +
+          `  That is not an existing directory. Close this pane and relaunch with\r\n` +
+          `  an absolute path (e.g. ${homedir()}/projects/my-repo).\r\n`,
+      );
+      this.handlers.onExit(opts.paneId, 1);
+      return null;
+    }
+
+    let command: string | undefined;
+    let codexArgs: string[] | undefined;
+    let exportPath: string | undefined;
+    let xdgHome: string | undefined;
+
+    if (!opts.shellOnly && opts.agent === 'codex') {
+      const model = opts.route?.model ?? opts.model;
+      if (!model) {
+        this.emit(opts.paneId, '\r\n\x1b[1;31mCannot start Codex without a selected model.\x1b[0m\r\n');
+        this.handlers.onExit(opts.paneId, 1);
+        return null;
+      }
+      const scriptPath = this.store.ensureCodexHookScript(codexHookScriptSource());
+      codexArgs = buildCodexArgs({
+        model,
+        prompt: opts.prompt,
+        resumeSessionId: opts.resumeSessionId,
+        configEntries: buildCodexConfigEntries({
+          nodePath: process.execPath,
+          scriptPath,
+          exaEnabled: Boolean(process.env.EXA_API_KEY?.trim()),
+        }),
+      });
+    } else if (!opts.shellOnly) {
+      // Every session starts with context.dev, keyed by its workspace. This
+      // cannot ride along in the --config file: devin reads MCP servers from
+      // dedicated mcp_config.json files and ignores an mcpServers key in the
+      // config it is handed. See devin-config-dir.ts.
+      const paneConfig = this.writePaneConfig(opts.paneId, opts.contextApiKey);
+      xdgHome = paneConfig.xdgHome;
+
+      exportPath = join(this.store.paneDir(opts.paneId), 'export.json');
+      command = buildDevinLaunch({
+        configPath: paneConfig.configPath,
+        exportPath,
+        model: opts.model,
+        permissionMode: opts.permissionMode,
+        prompt: opts.prompt,
+        resumeSessionId: opts.resumeSessionId,
+      });
+    }
+
+    const shell = isWindows ? 'powershell.exe' : process.env.SHELL || '/bin/zsh';
+    // Codex owns the interactive process; login startup files must not intercept it.
+    const pty = ptySpawn(codexArgs ? codexArgs[0]! : shell, codexArgs ? codexArgs.slice(1) : shellLaunchArgs(command, isWindows), {
+      name: 'xterm-256color',
+      cols: opts.cols,
+      rows: opts.rows,
+      cwd,
+      env: {
+        ...process.env,
+        OPENROUTER_API_KEY: openRouterApiKey(process.env),
+        TERM: 'xterm-256color',
+        // Points devin at the pane's own config directory, which is a shadow of
+        // ~/.config with devin/mcp_config.json generated for this workspace's
+        // key. Set for the pane rather than the server so two workspaces can run
+        // side by side on different keys. Credentials live under XDG_DATA_HOME
+        // and are untouched, so the session stays authenticated — verified.
+        ...(xdgHome ? { XDG_CONFIG_HOME: xdgHome } : {}),
+      } as Record<string, string>,
+    });
+
+    const scanner = new OscScanner();
+    this.scanners.set(opts.paneId, scanner);
+
+    const handle: PaneHandle = { paneId: opts.paneId, pty, exportPath };
+    pty.onData((data) => {
+      if (this.panes.get(opts.paneId) !== handle) return;
+      // Strip our OSC-777 before the bytes reach xterm, so status signalling is
+      // never visible in the pane.
+      const { output, signals } = scanner.push(data);
+      for (const signal of signals) {
+        if (signal.kind === 'codex') this.handlers.onCodexEvent?.(opts.paneId, signal);
+        else this.handlers.onSignal(opts.paneId, signal);
+      }
+      if (output) this.emit(opts.paneId, output);
+    });
+    pty.onExit(({ exitCode }) => {
+      if (this.panes.get(opts.paneId) !== handle) return;
+      this.panes.delete(opts.paneId);
+      this.scanners.delete(opts.paneId);
+      // Mirror the client's exit line into the buffer so a terminal that
+      // attaches after the process is gone still sees why it stopped.
+      this.append(opts.paneId, `\r\n\x1b[2m[process exited with code ${exitCode}]\x1b[0m\r\n`);
+      this.handlers.onExit(opts.paneId, exitCode);
+    });
+
+    this.panes.set(opts.paneId, handle);
+    return handle;
+  }
+
+  /** Buffer output, then forward it live to the connected clients. */
+  private emit(paneId: string, data: string): void {
+    this.append(paneId, data);
+    this.handlers.onData(paneId, data);
+  }
+
+  /** Append to the pane's replay buffer, trimming the oldest bytes past the cap. */
+  private append(paneId: string, data: string): void {
+    const next = (this.buffers.get(paneId) ?? '') + data;
+    this.buffers.set(
+      paneId,
+      next.length > MAX_BUFFER_BYTES ? next.slice(next.length - MAX_BUFFER_BYTES) : next,
+    );
+  }
+
+  /** The recent output for a pane, for a client that is (re)attaching to it. */
+  snapshot(paneId: string): string | undefined {
+    return this.buffers.get(paneId);
+  }
+
+  write(paneId: string, data: string): void {
+    this.panes.get(paneId)?.pty.write(data);
+  }
+
+  resize(paneId: string, cols: number, rows: number): void {
+    try {
+      this.panes.get(paneId)?.pty.resize(cols, rows);
+    } catch {
+      // A resize racing an exit is expected, not an error worth surfacing.
+    }
+  }
+
+  kill(paneId: string): void {
+    // Keep final output replayable; a new spawn resets its invocation buffer.
+    const handle = this.panes.get(paneId);
+    if (!handle) return;
+    this.panes.delete(paneId);
+    this.scanners.delete(paneId);
+    try {
+      handle.pty.kill();
+    } catch {
+      /* already gone */
+    }
+  }
+
+  exportPathFor(paneId: string): string | undefined {
+    return this.panes.get(paneId)?.exportPath;
+  }
+
+  has(paneId: string): boolean {
+    return this.panes.has(paneId);
+  }
+
+  /** Kill every pane — the server is going away, no orphan devin processes. */
+  killAll(): void {
+    for (const id of [...this.panes.keys()]) this.kill(id);
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "models": [
+    {
+      "id": "fast",
+      "label": "Fast",
+      "provider": "openai",
+      "model": "openai/gpt-5.6-luna"
+    },
+    {
+      "id": "balanced",
+      "label": "Balanced",
+      "provider": "openai",
+      "model": "openai/gpt-5.6-sol"
+    },
+    {
+      "id": "capable",
+      "label": "Capable",
+      "provider": "openai",
+      "model": "openai/gpt-6-astra"
+    }
+  ],
+  "tiers": {
+    "simple": "fast",
+    "standard": "balanced",
+    "complex": "capable"
+  },
+  "classifierModelId": "fast"
+}
