@@ -16,7 +16,9 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run",
     "convex:dev": "convex dev",
-    "start:runner": "node --env-file=.env --env-file=.env.runner.local --import tsx src/server/index.ts"
+    "start:runner": "node --env-file=.env --env-file=.env.runner.local --import tsx src/server/index.ts",
+    "prestart:runner": "node scripts/fix-node-pty.mjs",
+    "predev:server": "node scripts/fix-node-pty.mjs"
   },
   "dependencies": {
     "@auth0/auth0-react": "^2.24.1",
