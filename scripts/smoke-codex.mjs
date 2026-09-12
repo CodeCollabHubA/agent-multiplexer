@@ -132,7 +132,7 @@ async function main() {
     });
     server = spawn(process.execPath, ['--import', 'tsx', 'src/server/index.ts'], {
       cwd: new URL('..', import.meta.url),
-      env: { ...process.env, PORT: String(port), DEVIN_MUX_HOME: appProfile, CODEX_HOME: codexHome, CONVEX_URL: '', VITE_CONVEX_URL: '' },
+      env: { ...process.env, PORT: String(port), DEVIN_MUX_HOME: appProfile, CODEX_HOME: codexHome, CONVEX_URL: '', VITE_CONVEX_URL: '', CONVEX_PROFILE: '', CONVEX_MACHINE_TOKEN: '' },
       stdio: ['ignore', 'ignore', 'ignore'],
     });
     await new Promise((resolveOpen, reject) => {

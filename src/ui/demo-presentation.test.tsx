@@ -41,7 +41,7 @@ vi.mock('./TerminalPane.js', () => ({ TerminalPane: () => null }));
 it('keeps legacy history and context promises out of the empty workspace screen', async () => {
   vi.stubEnv('VITE_ENABLE_DEVIN', '');
   const { App } = await import('./App.js');
-  const html = renderToStaticMarkup(<App />);
+  const html = renderToStaticMarkup(<App backend={{} as import('./backend.js').Backend} />);
   expect(html).not.toContain('Resume a past session');
   expect(html).not.toContain('context budget');
 });

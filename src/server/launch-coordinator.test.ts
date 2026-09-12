@@ -66,3 +66,26 @@ it.each(['devin', 'shell'])('contains %s launch exceptions', async (agent) => {
   await expect(coordinator.start({ ...request, agent: 'devin', shellOnly: agent === 'shell' }, send)).resolves.toBeUndefined();
   expect(send).toHaveBeenCalledWith(expect.objectContaining({ t: 'pane:error', error: 'spawn failed' }));
 });
+
+it('does not spawn after authorization is revoked during classification', async () => {
+  const spawn = vi.fn();
+  const coordinator = new LaunchCoordinator({
+    config: DEMO_ROUTING_CONFIG, apiKey: 'key', spawn,
+    route: async () => ({ modelId: 'fast', model: 'openai/x', provider: 'openai', complexity: 'simple', reason: 'small' }),
+    authorize: async () => { throw new Error('Runner authorization failed'); },
+  });
+  const send = vi.fn();
+  await coordinator.start(request, send);
+  expect(spawn).not.toHaveBeenCalled();
+  expect(send).toHaveBeenCalledWith(expect.objectContaining({ t: 'pane:error' }));
+});
+it('canceling while the final authorization check is pending prevents spawn', async () => {
+  let release!: () => void;
+  const spawn = vi.fn();
+  const coordinator = new LaunchCoordinator({ config: DEMO_ROUTING_CONFIG, apiKey: 'key', spawn,
+    authorize: () => new Promise<void>(resolve => { release = resolve; }),
+  });
+  const pending = coordinator.start({ ...request, prompt: undefined }, vi.fn());
+  coordinator.cancel('p1'); release(); await pending;
+  expect(spawn).not.toHaveBeenCalled();
+});

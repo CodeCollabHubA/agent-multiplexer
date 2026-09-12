@@ -1,5 +1,6 @@
 import { mutation, query } from './_generated/server';
 import { v } from 'convex/values';
+import { requireMember, requireMachine, requireReader } from './access';
 
 /**
  * Mirror endpoints.
@@ -25,14 +26,15 @@ const workspaceArg = v.object({
 
 export const pushState = mutation({
   args: {
-    profileKey: v.optional(v.string()),
+    profileKey: v.string(), machineToken: v.string(),
     storeVersion: v.number(),
     activeWorkspaceId: v.optional(v.string()),
     workspaceOrder: v.array(v.string()),
     workspaces: v.array(workspaceArg),
   },
   handler: async (ctx, args) => {
-    const profileKey = args.profileKey ?? 'default';
+    await requireMachine(ctx, args.profileKey, args.machineToken);
+    const profileKey = args.profileKey;
     const now = Date.now();
 
     const existing = await ctx.db
@@ -88,9 +90,10 @@ export const pushState = mutation({
 
 /** Read the mirror — for a remote/read-only view of what a machine has open. */
 export const pullState = query({
-  args: { profileKey: v.optional(v.string()) },
+  args: { profileKey: v.string(), machineToken: v.optional(v.string()) },
   handler: async (ctx, args) => {
-    const profileKey = args.profileKey ?? 'default';
+    await requireReader(ctx, args.profileKey, args.machineToken);
+    const profileKey = args.profileKey;
     const profile = await ctx.db
       .query('profiles')
       .withIndex('by_profile', (q) => q.eq('profileKey', profileKey))
@@ -110,9 +113,10 @@ const commandArg = v.object({
 });
 
 export const enqueueCommands = mutation({
-  args: { profileKey: v.optional(v.string()), commands: v.array(commandArg) },
+  args: { profileKey: v.string(), commands: v.array(commandArg) },
   handler: async (ctx, args) => {
-    const profileKey = args.profileKey ?? 'default';
+    await requireMember(ctx, args.profileKey);
+    const profileKey = args.profileKey;
     for (const command of args.commands) {
       const existing = await ctx.db
         .query('terminalCommands')
@@ -124,19 +128,22 @@ export const enqueueCommands = mutation({
 });
 
 export const pendingCommands = query({
-  args: { profileKey: v.optional(v.string()) },
-  handler: async (ctx, args) =>
-    ctx.db
+  args: { profileKey: v.string(), machineToken: v.string() },
+  handler: async (ctx, args) => {
+    await requireMachine(ctx, args.profileKey, args.machineToken);
+    return ctx.db
       .query('terminalCommands')
-      .withIndex('by_profile', (q) => q.eq('profileKey', args.profileKey ?? 'default'))
+      .withIndex('by_profile', (q) => q.eq('profileKey', args.profileKey))
       .order('asc')
-      .take(500),
+      .take(500);
+  },
 });
 
 export const acknowledgeCommands = mutation({
-  args: { profileKey: v.optional(v.string()), commandIds: v.array(v.string()) },
+  args: { profileKey: v.string(), machineToken: v.string(), commandIds: v.array(v.string()) },
   handler: async (ctx, args) => {
-    const profileKey = args.profileKey ?? 'default';
+    await requireMachine(ctx, args.profileKey, args.machineToken);
+    const profileKey = args.profileKey;
     for (const commandId of args.commandIds) {
       const row = await ctx.db
         .query('terminalCommands')
@@ -148,12 +155,13 @@ export const acknowledgeCommands = mutation({
 });
 
 export const acknowledgeCommand = mutation({
-  args: { profileKey: v.optional(v.string()), commandId: v.string() },
+  args: { profileKey: v.string(), machineToken: v.string(), commandId: v.string() },
   handler: async (ctx, args) => {
+    await requireMachine(ctx, args.profileKey, args.machineToken);
     const row = await ctx.db
       .query('terminalCommands')
       .withIndex('by_command', (q) =>
-        q.eq('profileKey', args.profileKey ?? 'default').eq('commandId', args.commandId),
+        q.eq('profileKey', args.profileKey).eq('commandId', args.commandId),
       )
       .unique();
     if (row) await ctx.db.delete(row._id);
@@ -162,14 +170,15 @@ export const acknowledgeCommand = mutation({
 
 export const updateMachineStatus = mutation({
   args: {
-    profileKey: v.optional(v.string()),
+    profileKey: v.string(), machineToken: v.string(),
     home: v.string(),
     cwd: v.string(),
     agentId: v.string(),
     hasDefaultContextKey: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
-    const profileKey = args.profileKey ?? 'default';
+    await requireMachine(ctx, args.profileKey, args.machineToken);
+    const profileKey = args.profileKey;
     const row = await ctx.db
       .query('machineStatus')
       .withIndex('by_profile', (q) => q.eq('profileKey', profileKey))
@@ -188,18 +197,21 @@ export const updateMachineStatus = mutation({
 });
 
 export const getMachineStatus = query({
-  args: { profileKey: v.optional(v.string()) },
-  handler: async (ctx, args) =>
-    ctx.db
+  args: { profileKey: v.string(), machineToken: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    await requireReader(ctx, args.profileKey, args.machineToken);
+    return ctx.db
       .query('machineStatus')
-      .withIndex('by_profile', (q) => q.eq('profileKey', args.profileKey ?? 'default'))
-      .unique(),
+      .withIndex('by_profile', (q) => q.eq('profileKey', args.profileKey))
+      .unique();
+  },
 });
 
 export const appendOutput = mutation({
-  args: { profileKey: v.optional(v.string()), paneId: v.string(), data: v.string() },
+  args: { profileKey: v.string(), machineToken: v.string(), paneId: v.string(), data: v.string() },
   handler: async (ctx, args) => {
-    const profileKey = args.profileKey ?? 'default';
+    await requireMachine(ctx, args.profileKey, args.machineToken);
+    const profileKey = args.profileKey;
     const row = await ctx.db
       .query('terminalPanes')
       .withIndex('by_pane', (q) => q.eq('profileKey', profileKey).eq('paneId', args.paneId))
@@ -219,28 +231,31 @@ export const appendOutput = mutation({
 });
 
 export const terminalState = query({
-  args: { profileKey: v.optional(v.string()) },
-  handler: async (ctx, args) =>
-    ctx.db
+  args: { profileKey: v.string(), machineToken: v.optional(v.string()) },
+  handler: async (ctx, args) => {
+    await requireReader(ctx, args.profileKey, args.machineToken);
+    return ctx.db
       .query('terminalPanes')
-      .withIndex('by_profile', (q) => q.eq('profileKey', args.profileKey ?? 'default'))
-      .collect(),
+      .withIndex('by_profile', (q) => q.eq('profileKey', args.profileKey))
+      .collect();
+  },
 });
 
 export const publishEvent = mutation({
   args: {
-    profileKey: v.optional(v.string()),
+    profileKey: v.string(), machineToken: v.string(),
     eventId: v.string(),
     message: v.string(),
     createdAt: v.number(),
   },
   handler: async (ctx, args) => {
-    const profileKey = args.profileKey ?? 'default';
+    await requireMachine(ctx, args.profileKey, args.machineToken);
+    const profileKey = args.profileKey;
     const existing = await ctx.db
       .query('realtimeEvents')
       .withIndex('by_event', (q) => q.eq('profileKey', profileKey).eq('eventId', args.eventId))
       .unique();
-    if (!existing) await ctx.db.insert('realtimeEvents', { ...args, profileKey });
+    if (!existing) await ctx.db.insert('realtimeEvents', { profileKey, eventId: args.eventId, message: args.message, createdAt: args.createdAt });
     const rows = await ctx.db
       .query('realtimeEvents')
       .withIndex('by_profile', (q) => q.eq('profileKey', profileKey))
@@ -251,11 +266,12 @@ export const publishEvent = mutation({
 });
 
 export const realtimeEvents = query({
-  args: { profileKey: v.optional(v.string()) },
+  args: { profileKey: v.string(), machineToken: v.optional(v.string()) },
   handler: async (ctx, args) => {
+    await requireReader(ctx, args.profileKey, args.machineToken);
     const rows = await ctx.db
       .query('realtimeEvents')
-      .withIndex('by_profile', (q) => q.eq('profileKey', args.profileKey ?? 'default'))
+      .withIndex('by_profile', (q) => q.eq('profileKey', args.profileKey))
       .order('desc')
       .take(250);
     return rows.reverse();

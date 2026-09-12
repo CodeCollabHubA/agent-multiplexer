@@ -16,6 +16,10 @@ A local-first browser workspace with a ticket board and real Codex terminals. St
 
 The model badge records the launch selection and reason. Changing models inside Codex does not update that badge. Completion follows trusted lifecycle hooks; a process exit alone is not a successful task.
 
+## Sign-in setup
+
+The browser uses Auth0 Universal Login. Complete the callback, logout, and web-origin settings in [the Auth0 setup guide](docs/auth0-setup.md) before signing in. Convex validates authenticated workspace membership for all state, terminal and command access. Create a shared workspace, invite teammates with a single-use link, and pair a machine runner. Members have equal access; there are no roles.
+
 ## Run locally
 
 Requirements: Node.js 20 or newer, a C toolchain for `node-pty`, Codex CLI on `PATH`, an OpenRouter API key, and an Exa API key for search.
@@ -27,13 +31,13 @@ npm install
 cp .env.example .env
 ```
 
-Set `OPENROUTER_API_KEY` and `EXA_API_KEY` in `.env`, then:
+Set `VITE_CONVEX_URL`, `OPENROUTER_API_KEY` and `EXA_API_KEY` in `.env`, then start the browser:
 
 ```sh
-npm run dev
+npm run dev:web
 ```
 
-Open **http://localhost:5173**. Create a workspace pointing at an existing project directory, choose a board or terminal grid, and start Codex.
+Open **http://localhost:5173** and sign in. Create a shared workspace and pair your machine using [the setup guide](docs/auth0-setup.md). Once the runner is online, create a project pointing at an existing directory, choose a board or terminal grid, and start Codex.
 
 `OPEN_ROUTER_API_KEY` is also accepted. If using that spelling, remove the `OPENROUTER_API_KEY` line from `.env`: the canonical spelling takes precedence even when blank. Never prefix credentials with `VITE_`.
 
@@ -58,9 +62,9 @@ The integration has been checked with a real Auto-routed Codex task that called 
 
 ## How it works
 
-The React UI talks to a local Node server over WebSocket. The server classifies tasks through OpenRouter, starts native Codex processes through PTYs, and streams terminal output. Observational Codex hooks supply lifecycle events and session identities. Exa is configured as a per-launch MCP server.
+The React UI signs in with Auth0 and reads workspace state through authenticated Convex subscriptions. Commands travel through a membership-checked queue to a separately paired Node runner. The runner classifies tasks through OpenRouter, starts native Codex processes through PTYs, and streams terminal output through Convex. Observational Codex hooks supply lifecycle events and session identities. Exa is configured as a per-launch MCP server.
 
-Workspaces, cards, layouts, and session metadata are stored under `~/.devin-agent-tmux/` for compatibility. `DEVIN_MUX_HOME` can select a separate profile, useful for recording a clean demo. Browser refresh reconnects to live processes; restarting the server stops those processes. Optional Convex synchronization remains available through the settings documented in `.env.example`; it is not needed for the local demo.
+Project boards, cards, layouts and session metadata are stored on the runner and mirrored to Convex. Each authenticated shared workspace has an isolated local store. `DEVIN_MUX_HOME` selects the base directory, useful for a clean demo. Browser refresh reconnects to live processes; restarting the runner stops them. The authenticated browser requires Convex; setup and Cloudflare deployment are documented in [the Auth0/workspace guide](docs/auth0-setup.md). Existing anonymous profiles remain preserved and inaccessible to newly signed-in users.
 
 ## Optional legacy integration
 

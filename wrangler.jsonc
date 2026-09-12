@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ai-thinkers",
+  "account_id": "42a553874c535be85f375869fe0e02a3",
+  "compatibility_date": "2026-09-12",
+  "assets": {
+    "directory": "./dist/web",
+    "not_found_handling": "single-page-application"
+  }
+}

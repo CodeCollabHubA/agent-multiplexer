@@ -19,6 +19,7 @@
  * session file loses that session, never the profile.
  */
 import { mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync, existsSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { type AppState, type Card, type SessionConfig, type Workspace, CARD_COLUMNS, STORE_VERSION, emptyState } from '../core/models.js';
@@ -73,6 +74,34 @@ export class FileStore {
   constructor(root = profileRoot()) {
     this.root = root;
     mkdirSync(this.root, { recursive: true });
+  }
+
+  hasState(): boolean {
+    return existsSync(this.statePath());
+  }
+
+  pairingMatches(credentialHash: string): boolean {
+    try {
+      return this.hasState() && readFileSync(join(this.root, '.machine-credential.sha256'), 'utf8').trim() === credentialHash;
+    } catch { return false; }
+  }
+
+  /** Install a new pairing epoch without deleting the previous local snapshot. */
+  initializePairing(state: AppState, credentialHash: string): void {
+    const stagingRoot = `${this.root}.incoming-${randomUUID()}`;
+    const staging = new FileStore(stagingRoot);
+    staging.save(state);
+    writeFileSync(join(stagingRoot, '.machine-credential.sha256'), `${credentialHash}\n`, { mode: 0o600 });
+    const backupRoot = `${this.root}.backup-${randomUUID()}`;
+    // The candidate is complete before the old root moves. Keep all old files,
+    // including pane output/config and unknown files, in a non-overwriting sibling.
+    renameSync(this.root, backupRoot);
+    try {
+      renameSync(stagingRoot, this.root);
+    } catch (error) {
+      renameSync(backupRoot, this.root);
+      throw error;
+    }
   }
 
   private statePath() {

@@ -2066,3 +2066,48 @@ textarea:focus-visible {
 .pane-recovery button { flex: none; }
 
 .stage > .pane-slot { height: 100%; overflow: hidden; }
+
+/* Auth0 entry and account chrome; the workspace keeps its remaining height. */
+.auth-screen {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+}
+.auth-card {
+  width: min(100%, 440px);
+  padding: 32px;
+  background: var(--surface-1);
+  border: 1px solid var(--hairline);
+  border-radius: var(--r-md);
+}
+.auth-card h1 { margin: 16px 0; }
+.auth-card p { color: var(--ink-2); }
+.auth-actions { display: flex; gap: 12px; margin-top: 24px; }
+.authenticated-shell { height: 100dvh; display: flex; flex-direction: column; }
+.account-bar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 4px 16px;
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface-1);
+  font-size: 0.8125rem;
+}
+.account-bar > span { overflow-wrap: anywhere; }
+.authenticated-workspace { flex: 1; min-height: 0; overflow: hidden; }
+.authenticated-workspace > .app { height: 100%; }
+
+.shared-workspace-shell { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.shared-workspace-shell > .app { flex: 1; min-height: 0; }
+.space-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 10px 18px; border-bottom: 1px solid var(--line, #d4d0c7); }
+.space-bar form, .space-settings form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.space-bar label { display: flex; align-items: center; gap: 8px; }
+.space-settings { padding: 18px; overflow: auto; max-height: 60vh; border-bottom: 1px solid var(--line, #d4d0c7); }
+.space-settings h3 { margin-top: 20px; }
+.space-settings li { margin: 8px 0; }
+.space-notice { padding: 12px 18px; }
+.space-secret { display: block; margin: 12px 0; padding: 12px; border: 1px solid var(--line, #d4d0c7); }
+.space-secret input { display: block; width: 100%; margin-top: 8px; }
+.space-secret pre { white-space: pre-wrap; overflow-wrap: anywhere; user-select: all; }

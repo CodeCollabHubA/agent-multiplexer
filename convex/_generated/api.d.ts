@@ -8,7 +8,9 @@
  * @module
  */
 
+import type * as access from "../access.js";
 import type * as mux from "../mux.js";
+import type * as spaces from "../spaces.js";
 
 import type {
   ApiFromModules,
@@ -17,7 +19,9 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  access: typeof access;
   mux: typeof mux;
+  spaces: typeof spaces;
 }>;
 
 /**

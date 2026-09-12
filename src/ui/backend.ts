@@ -1,29 +1,16 @@
-/**
- * Browser-side transport.
- *
- * Two modes, chosen once at construction and invisible to the rest of the UI:
- *
- *   - Local (default): one WebSocket to the machine's server, exactly as before.
- *   - Convex realtime: when VITE_CONVEX_URL is set, the browser talks to Convex
- *     instead — reading state/terminal/status from subscriptions and writing
- *     input/spawn/resize/kill into a command queue the machine agent drains.
- *     This is what lets a browser that is NOT on the machine drive the panes.
- *
- * Either way the public surface is identical: `send`, `subscribe`, and the two
- * request/response helpers. The rest of the app never learns which is in use.
- *
- * The WebSocket path reconnects on drop: `npm run dev` restarts the server on
- * edit, and a UI that needed a manual refresh after every reload would be
- * unusable.
- */
-import { ConvexClient } from 'convex/browser';
+/** Browser transport scoped to one selected workspace. The authentication
+ * provider owns the shared Convex client; this adapter owns only its watches,
+ * requests and local caches. Explicit local WebSocket transport is retained
+ * for development callers. */
+import type { ConvexReactClient } from 'convex/react';
+import { makeFunctionReference } from 'convex/server';
 import type { ClientMessage, ServerMessage } from '../server/protocol.js';
 import type { AcpErrorKind, AcpSessionSummary } from '../core/acp.js';
 import type { AppState, Card, Workspace } from '../core/models.js';
 import type { Trace } from '../core/trace.js';
 
 type Listener = (msg: ServerMessage) => void;
-type ConvexClientLike = {
+export type ConvexClientLike = {
   mutation: (name: unknown, args: unknown) => Promise<unknown>;
   onUpdate: (
     name: unknown,
@@ -32,6 +19,22 @@ type ConvexClientLike = {
     onError?: (error: Error) => void,
   ) => () => void;
 };
+/** Adapt the provider-owned client without creating another auth session. */
+export function authenticatedTransport(client: ConvexReactClient): ConvexClientLike {
+  return {
+    mutation: (name, args) => client.mutation(makeFunctionReference<'mutation'>(String(name)), args as Record<string, any>),
+    onUpdate: (name, args, callback, onError) => {
+      const watch = client.watchQuery(makeFunctionReference<'query'>(String(name)), args as Record<string, any>);
+      const update = () => {
+        try { const value = watch.localQueryResult(); if (value !== undefined) callback(value); }
+        catch (error) { onError?.(error instanceof Error ? error : new Error(String(error))); }
+      };
+      const off = watch.onUpdate(update);
+      update();
+      return off;
+    },
+  };
+}
 type QueuedCommand = { commandId: string; message: string; createdAt: number };
 
 /**
@@ -70,21 +73,56 @@ export class Backend {
    */
   private attachWaiters = new Set<string>();
   private seenEvents = new Set<string>();
-  private readonly profileKey = import.meta.env.VITE_CONVEX_PROFILE || 'default';
+  private readonly profileKey: string;
+  private disposed = false;
+  private subscriptions: (() => void)[] = [];
+  private pendingRequests = new Set<() => void>();
+  private url: string;
+  private onError?: (error: Error) => void;
 
-  constructor(private url = `ws://${location.hostname}:5173/pty`) {
-    const convexUrl = import.meta.env.VITE_CONVEX_URL;
-    if (convexUrl) this.connectConvex(convexUrl);
+  constructor(options: { client: ConvexClientLike; profileKey: string; onError?: (error: Error) => void } | { url: string }) {
+    this.url = 'url' in options ? options.url : '';
+    this.profileKey = 'profileKey' in options ? options.profileKey : '';
+    if ('client' in options) { this.onError = options.onError; this.convex = options.client; this.connectConvex(); }
     else this.connect();
   }
 
-  // ---- Convex realtime path -------------------------------------------------
+  dispose() {
+    if (this.disposed) return;
+    this.disposed = true;
+    for (const off of this.subscriptions) off();
+    this.subscriptions = [];
+    for (const cancel of this.pendingRequests) cancel();
+    this.pendingRequests.clear();
+    if (this.commandTimer !== null) window.clearTimeout(this.commandTimer);
+    if (this.reconnectTimer !== null) window.clearTimeout(this.reconnectTimer);
+    if (this.ws) { this.ws.onclose = null; this.ws.onmessage = null; this.ws.close(); }
+    this.ws = null;
+    this.commandQueue = []; this.queue = [];
+    this.latestState = null; this.latestEnv = null;
+    this.latestRuntime.clear(); this.snapshots.clear(); this.attachWaiters.clear(); this.seenEvents.clear();
+    this.listeners.clear();
+  }
 
-  private connectConvex(url: string) {
-    this.convex = new ConvexClient(url) as unknown as ConvexClientLike;
+  private watch(name: string, args: unknown, callback: (value: any) => void) {
+    if (this.disposed) return;
+    const off = this.convex!.onUpdate(name, args, value => {
+      if (!this.disposed) callback(value);
+    }, error => this.fail(error));
+    if (this.disposed) off();
+    else this.subscriptions.push(off);
+  }
+
+  private fail(error: Error) {
+    if (this.disposed) return;
+    this.dispose();
+    this.onError?.(error);
+  }
+
+  private connectConvex() {
     const args = { profileKey: this.profileKey };
 
-    this.convex.onUpdate('mux:pullState', args, (value) => {
+    this.watch('mux:pullState', args, (value) => {
       if (!value?.profile) return;
       const workspaces: Record<string, Workspace> = {};
       for (const row of value.workspaces as any[]) {
@@ -115,7 +153,7 @@ export class Backend {
       this.emit({ t: 'state', state });
     });
 
-    this.convex.onUpdate('mux:getMachineStatus', args, (value) => {
+    this.watch('mux:getMachineStatus', args, (value) => {
       if (value) {
         this.emit({
           t: 'env',
@@ -129,7 +167,7 @@ export class Backend {
     // Terminal output. A pane seen for the first time delivers its whole
     // backlog via pane:snapshot (so the terminal's attach logic completes);
     // afterwards only the newest chunk is streamed as pane:data.
-    this.convex.onUpdate('mux:terminalState', args, (rows) => {
+    this.watch('mux:terminalState', args, (rows) => {
       for (const row of rows as any[]) {
         const previous = this.snapshots.get(row.paneId);
         this.snapshots.set(row.paneId, { snapshot: row.snapshot, outputVersion: row.outputVersion });
@@ -144,7 +182,7 @@ export class Backend {
       }
     });
 
-    this.convex.onUpdate('mux:realtimeEvents', args, (rows) => {
+    this.watch('mux:realtimeEvents', args, (rows) => {
       for (const row of rows as any[]) {
         if (this.seenEvents.has(row.eventId)) continue;
         this.seenEvents.add(row.eventId);
@@ -160,6 +198,7 @@ export class Backend {
   // ---- local WebSocket path -------------------------------------------------
 
   private connect() {
+    if (this.disposed) return;
     const ws = new WebSocket(this.url);
     this.ws = ws;
 
@@ -194,6 +233,7 @@ export class Backend {
   }
 
   private emit(msg: ServerMessage): void {
+    if (this.disposed) return;
     // Cache the messages a late subscriber needs to catch up. Terminal bytes and
     // snapshots are one-shot streams and are never cached.
     if (msg.t === 'state') this.latestState = msg;
@@ -213,6 +253,7 @@ export class Backend {
   }
 
   send(msg: ClientMessage) {
+    if (this.disposed) return;
     if (this.convex) {
       // A terminal that just mounted wants its backlog. If we already have a
       // snapshot for the pane, answer immediately; otherwise remember the pane
@@ -256,26 +297,27 @@ export class Backend {
 
   private flushCommands(): void {
     this.commandTimer = null;
-    if (!this.convex || this.commandInFlight || this.commandQueue.length === 0) return;
+    if (this.disposed || !this.convex || this.commandInFlight || this.commandQueue.length === 0) return;
     const commands = this.commandQueue;
     this.commandQueue = [];
     this.commandInFlight = true;
-    let retryDelay = 16;
     void this.convex
       .mutation('mux:enqueueCommands', { profileKey: this.profileKey, commands })
-      .catch(() => {
-        retryDelay = 500;
-        this.commandQueue = [...commands, ...this.commandQueue];
+      .catch((error: unknown) => {
+        if (this.disposed) return;
+        this.commandQueue = [];
+        this.fail(error instanceof Error ? error : new Error(String(error)));
       })
       .finally(() => {
         this.commandInFlight = false;
-        if (this.commandQueue.length > 0 && this.commandTimer === null) {
-          this.commandTimer = window.setTimeout(() => this.flushCommands(), retryDelay);
+        if (!this.disposed && this.commandQueue.length > 0 && this.commandTimer === null) {
+          this.commandTimer = window.setTimeout(() => this.flushCommands(), 16);
         }
       });
   }
 
   subscribe(listener: Listener): () => void {
+    if (this.disposed) return () => {};
     this.listeners.add(listener);
     // Catch a late subscriber up to the current world without waiting for the
     // next update — important on the Convex path, where subscriptions fire once
@@ -297,15 +339,20 @@ export class Backend {
     msg: ClientMessage,
     match: (m: ServerMessage) => { value: T } | { error: string; kind?: AcpErrorKind } | undefined,
   ): Promise<T> {
+    if (this.disposed) return Promise.reject(new Error('Workspace closed'));
     return new Promise((resolve, reject) => {
+      const cancel = () => { window.clearTimeout(timer); off(); reject(new Error('Workspace closed')); };
+      this.pendingRequests.add(cancel);
       const timer = window.setTimeout(() => {
         off();
+        this.pendingRequests.delete(cancel);
         reject(new Error('timed out'));
       }, 90_000);
       const off = this.subscribe((m) => {
         const outcome = match(m);
         if (!outcome) return;
         window.clearTimeout(timer);
+        this.pendingRequests.delete(cancel);
         off();
         if ('error' in outcome) reject(new BackendError(outcome.error, outcome.kind));
         else resolve(outcome.value);

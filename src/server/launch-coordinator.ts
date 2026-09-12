@@ -21,6 +21,7 @@ export class LaunchCoordinator {
     apiKey: string;
     route?: RouteFn;
     has?: (paneId: string) => boolean;
+    authorize?: () => Promise<void>;
     spawn: (options: SpawnOptions) => PaneHandle | null | object;
   }) {}
 
@@ -28,6 +29,10 @@ export class LaunchCoordinator {
     this.generations.set(paneId, (this.generations.get(paneId) ?? 0) + 1);
     this.pending.get(paneId)?.abort();
     this.pending.delete(paneId);
+  }
+
+  cancelAll(): void {
+    for (const paneId of this.pending.keys()) this.cancel(paneId);
   }
 
   isPending(paneId: string): boolean {
@@ -43,6 +48,8 @@ export class LaunchCoordinator {
     try {
       send({ t: 'pane:starting', paneId: msg.paneId, routing: !msg.shellOnly && msg.agent === 'codex' });
       if (msg.shellOnly || (msg.agent ?? 'devin') === 'devin') {
+        if (this.deps.authorize) await this.deps.authorize();
+        if (controller.signal.aborted || this.generations.get(msg.paneId) !== generation) return;
         const pane = this.deps.spawn(msg);
         if (pane) {
           send({ t: 'pane:spawned', paneId: msg.paneId });
@@ -73,6 +80,7 @@ export class LaunchCoordinator {
           { apiKey: this.deps.apiKey, signal: controller.signal },
         );
       }
+      if (this.deps.authorize) await this.deps.authorize();
       if (controller.signal.aborted || this.generations.get(msg.paneId) !== generation) return;
       send({ t: 'pane:route', paneId: msg.paneId, route: decision });
       const pane = this.deps.spawn({ ...msg, agent: 'codex', route: decision, model: undefined });

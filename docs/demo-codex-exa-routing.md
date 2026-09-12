@@ -15,9 +15,12 @@ cp .env.example .env
 # Edit .env and set these server-only values:
 # OPENROUTER_API_KEY=...
 # EXA_API_KEY=...
+# VITE_CONVEX_URL=https://<deployment>.convex.cloud
 npm install
-npm run dev
+npm run dev:web
 ```
+
+Sign in, create a shared workspace and pair your runner using the [workspace setup guide](auth0-setup.md). Put its `CONVEX_URL`, `CONVEX_PROFILE` and `CONVEX_MACHINE_TOKEN` on the machine and start `npm run dev:server`. The deployed Cloudflare browser uses the same authenticated workspace.
 
 OpenRouter bills the classifier call and every Codex inference call. The
 `provider` value shown in the UI describes the model vendor; model access is

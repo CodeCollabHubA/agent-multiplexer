@@ -13,6 +13,12 @@ import { v } from 'convex/values';
  * anything.
  */
 export default defineSchema({
+  spaces: defineTable({ name: v.string(), createdAt: v.number() }),
+  memberships: defineTable({ profileKey: v.string(), subject: v.string(), name: v.string(), email: v.optional(v.string()) })
+    .index('by_subject', ['subject']).index('by_profile', ['profileKey']).index('by_member', ['profileKey', 'subject']),
+  invitations: defineTable({ profileKey: v.string(), tokenHash: v.string(), createdAt: v.number(), expiresAt: v.number(), consumedAt: v.optional(v.number()), revokedAt: v.optional(v.number()) })
+    .index('by_token', ['tokenHash']).index('by_profile', ['profileKey']),
+  machineCredentials: defineTable({ profileKey: v.string(), tokenHash: v.string() }).index('by_profile', ['profileKey']),
   profiles: defineTable({
     /** One row per machine/profile. Last write wins. */
     profileKey: v.string(),

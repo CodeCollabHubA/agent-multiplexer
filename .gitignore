@@ -4,3 +4,8 @@ dist/
 .env.local
 .convex/
 *.log
+
+# Local environment variants, deployment cache and implementation scratch.
+.env.*.local
+.wrangler/
+.superpowers/

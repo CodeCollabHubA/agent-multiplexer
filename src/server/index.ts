@@ -8,12 +8,14 @@
  */
 import { createServer } from 'node:http';
 import { homedir } from 'node:os';
-import { WebSocketServer, type WebSocket } from 'ws';
+import type { WebSocket } from 'ws';
 import { buildTrace } from '../core/trace.js';
 import { applySignal } from '../core/status.js';
 import { RuntimeState } from './runtime-state.js';
 import { loadEnvFile, openRouterApiKey } from './env.js';
-import { FileStore } from './store.js';
+import { FileStore, profileRoot } from './store.js';
+import { runnerConfiguration, runnerStoreRoot } from './runner-config.js';
+import { createRunnerWebSocketServer } from './runner-websocket.js';
 import { PaneSupervisor } from './panes.js';
 import { HealthWatcher } from './health.js';
 import { ConvexMirror } from './convex-mirror.js';
@@ -36,7 +38,8 @@ if (!process.env.CONTEXT_DEV_API_KEY?.trim()) {
 
 const PORT = Number(process.env.PORT || 5177);
 
-const store = new FileStore();
+const runnerConfig = runnerConfiguration(process.env);
+const store = new FileStore(runnerStoreRoot(profileRoot(), runnerConfig));
 const runtime = new RuntimeState();
 const clients = new Set<WebSocket>();
 let mirror: ConvexMirror | null = null;
@@ -105,6 +108,7 @@ const launches = new LaunchCoordinator({
   configError: routingConfigError,
   apiKey: openRouterApiKey(process.env),
   has: (paneId) => supervisor.has(paneId),
+  authorize: () => mirror?.assertAuthorized() ?? Promise.resolve(),
   spawn: (options) => {
     launchedAgents.set(options.paneId, options.shellOnly ? 'shell' : (options.agent ?? 'devin'));
     const pane = supervisor.spawn(options);
@@ -113,7 +117,8 @@ const launches = new LaunchCoordinator({
   },
 });
 
-mirror = await ConvexMirror.create(process.env.CONVEX_URL || process.env.VITE_CONVEX_URL);
+mirror = await ConvexMirror.create(runnerConfig.mode === 'paired' ? runnerConfig.url : undefined);
+await mirror.initializeStore(store);
 
 /**
  * Handle one client message. `send` is the reply channel for THIS caller — a
@@ -220,7 +225,11 @@ async function handle(
 // Push the current tree once at boot, then relay: browser commands over Convex
 // are routed into the same handler, replying back over Convex.
 mirror.push(store.load());
-mirror.start((message) => handle((response) => mirror?.publish(response), message));
+mirror.start((message) => handle((response) => mirror?.publish(response), message), () => {
+  launches.cancelAll();
+  supervisor.killAll();
+  health.stop();
+});
 
 const http = createServer((req, res) => {
   if (req.url === '/api/health') {
@@ -231,7 +240,7 @@ const http = createServer((req, res) => {
   res.writeHead(404).end();
 });
 
-const wss = new WebSocketServer({ server: http, path: '/pty' });
+const wss = createRunnerWebSocketServer(http, runnerConfig);
 
 wss.on('connection', (ws) => {
   clients.add(ws);

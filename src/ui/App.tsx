@@ -60,9 +60,7 @@ import type { AgentConfiguration } from '../server/protocol.js';
 import { beginLaunch, reduceLaunchState, type LaunchStates } from './launch-state.js';
 import { PaneLaunchFeedback } from './PaneLaunchFeedback.js';
 
-const backend = new Backend();
-
-export function App() {
+export function App({ backend }: { backend: Backend }) {
   const [state, setState] = useState<AppState>(emptyState());
   const [statuses, setStatuses] = useState<Record<string, PaneStatus>>({});
   const [healths, setHealths] = useState<Record<string, ContextHealth>>({});

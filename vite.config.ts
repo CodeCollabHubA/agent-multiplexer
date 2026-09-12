@@ -10,6 +10,7 @@ export default defineConfig({
   root: '.',
   server: {
     port: 5173,
+    strictPort: true,
     proxy: {
       '/api': { target: 'http://127.0.0.1:5177', changeOrigin: true },
       '/pty': { target: 'ws://127.0.0.1:5177', ws: true },
