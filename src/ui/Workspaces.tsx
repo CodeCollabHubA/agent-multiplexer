@@ -49,6 +49,7 @@ export function Workspaces() {
   const client = useConvex();
   const spaces = useQuery(query('spaces:list'), {}) as Space[] | undefined;
   const [selected, setSelected] = useState<string | null>(null);
+  const [creating, setCreating] = useState(false);
   const [name, setName] = useState('');
   const [invite, setInvite] = useState(() => pendingInvite());
   const [error, setError] = useState<string>();
@@ -60,20 +61,25 @@ export function Workspaces() {
     finally { setBusy(false); }
   }
   if (!spaces) return <p role="status">Loading shared workspaces…</p>;
+  const controls = <div className="space-controls">
+    <label className="space-picker"><span>Workspace</span><select aria-label="Shared workspace" value={active?.profileKey ?? ''} onChange={event => { setSelected(event.target.value); setCreating(false); }}>
+      {!active && <option value="">Choose a workspace</option>}
+      {spaces.map(space => <option key={space.profileKey} value={space.profileKey}>{space.name}</option>)}
+    </select></label>
+    <button className="ghost" aria-expanded={creating} aria-controls="create-shared-workspace" onClick={() => setCreating(!creating)}>+ New</button>
+  </div>;
   return <div className="shared-workspace-shell">
-    <header className="space-bar">
-      <label>Shared workspace <select aria-label="Shared workspace" value={active?.profileKey ?? ''} onChange={event => setSelected(event.target.value)}>
-        {!active && <option value="">Choose a workspace</option>}
-        {spaces.map(space => <option key={space.profileKey} value={space.profileKey}>{space.name}</option>)}
-      </select></label>
+    {creating && <section className="space-create-panel" id="create-shared-workspace" onKeyDown={event => { if (event.key === 'Escape') setCreating(false); }}>
       <form onSubmit={event => { event.preventDefault(); void run(async () => {
         const space = await client.mutation(mutation('spaces:create'), { name: name.trim() }) as Space;
-        setSelected(space.profileKey); setName('');
+        setSelected(space.profileKey); setName(''); setCreating(false);
       }); }}>
-        <input aria-label="New shared workspace name" placeholder="New shared workspace name" value={name} onChange={event => setName(event.target.value)} maxLength={100} required />
+        <label htmlFor="shared-workspace-name">New shared workspace</label>
+        <input id="shared-workspace-name" aria-label="New shared workspace name" placeholder="Workspace name" value={name} onChange={event => setName(event.target.value)} maxLength={100} required autoFocus />
         <button disabled={busy || !name.trim()}>Create shared workspace</button>
+        <button type="button" className="ghost" onClick={() => setCreating(false)}>Cancel</button>
       </form>
-    </header>
+    </section>}
     {error && <p className="space-notice error" role="alert">{error}</p>}
     {invite && <section className="space-notice"><p>You have an invitation to join a shared workspace.</p>
       <button disabled={busy} onClick={() => void run(async () => {
@@ -82,11 +88,11 @@ export function Workspaces() {
       })}>Accept invitation</button>
       <button className="ghost" disabled={busy} onClick={() => { clearInvite(); setInvite(null); }}>Dismiss invitation</button>
     </section>}
-    {active ? <WorkspaceErrorBoundary key={active.profileKey}><SelectedSpace space={active} /></WorkspaceErrorBoundary> : <main className="auth-screen"><section className="auth-card"><h1>Create your first shared workspace</h1><p>Invite teammates, pair a runner, then add project boards and terminals.</p></section></main>}
+    {active ? <WorkspaceErrorBoundary key={active.profileKey}><SelectedSpace space={active} controls={controls} /></WorkspaceErrorBoundary> : <><header className="space-bar">{controls}</header><main className="auth-screen"><section className="auth-card"><h1>Create your first shared workspace</h1><p>Invite teammates, pair a runner, then add project boards and terminals.</p><button onClick={() => setCreating(true)}>Create shared workspace</button></section></main></>}
   </div>;
 }
 
-function SelectedSpace({ space }: { space: Space }) {
+function SelectedSpace({ space, controls }: { space: Space; controls: ReactNode }) {
   const client = useConvex();
   const args = { profileKey: space.profileKey };
   const members = useQuery(query('spaces:members'), args) as Member[] | undefined;
@@ -109,7 +115,7 @@ function SelectedSpace({ space }: { space: Space }) {
   }
   const call = (name: string, values: Record<string, unknown> = {}) => client.mutation(mutation(`spaces:${name}`), { ...args, ...values });
   return <>
-    <div className="space-bar"><strong>{space.name}</strong><span role="status">{online ? 'Runner connected' : machine?.paired ? 'Runner disconnected' : 'No runner paired'}</span><button onClick={() => { setManage(!manage); setCredential(undefined); setLink(undefined); }}> {manage ? 'Close settings' : 'Members & settings'}</button></div>
+    <header className="space-bar">{controls}<div className="space-actions"><span className={`runner-indicator${online ? ' online' : ''}`} role="status">{online ? 'Runner connected' : machine?.paired ? 'Runner disconnected' : 'No runner paired'}</span><button onClick={() => { setManage(!manage); setCredential(undefined); setLink(undefined); }}> {manage ? 'Close settings' : 'Members & settings'}</button></div></header>
     {error && <p className="space-notice error" role="alert">{error}</p>}
     {manage && <section className="space-settings">
       <h2>Shared workspace settings</h2>
